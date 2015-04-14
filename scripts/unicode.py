@@ -11,15 +11,9 @@
 # except according to those terms.
 
 # This script uses the following Unicode tables:
-# - DerivedCoreProperties.txt
-# - DerivedNormalizationProps.txt
-# - EastAsianWidth.txt
 # - auxiliary/GraphemeBreakProperty.txt
 # - auxiliary/WordBreakProperty.txt
-# - PropList.txt
 # - ReadMe.txt
-# - Scripts.txt
-# - UnicodeData.txt
 #
 # Since this should not require frequent updates, we just store this
 # out-of-line and check the unicode.rs file into git.
