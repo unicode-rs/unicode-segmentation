@@ -1,8 +1,11 @@
 language: rust
 sudo: false
 script:
-  - cargo build --verbose
-  - cargo test --verbose
+  - cargo build --verbose --features no_std
+  - cargo test --verbose --features no_std
+  - cargo clean
+  - cargo build --verbose --features default
+  - cargo test --verbose --features default
   - rustdoc --test README.md -L target/debug -L target/debug/deps
   - cargo doc
 after_success: |

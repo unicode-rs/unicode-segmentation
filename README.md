@@ -26,6 +26,11 @@ fn main() {
 }
 ```
 
+# features
+
+unicode-segmentation supports a `no_std` feature. This eliminates dependence on std,
+and instead uses equivalent functions from core.
+
 # crates.io
 
 You can use this package in your project by adding the following
@@ -33,5 +38,5 @@ to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-unicode-segmentation = "0.0.1"
+unicode-segmentation = "0.1.0"
 ```

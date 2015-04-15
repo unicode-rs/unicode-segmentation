@@ -39,20 +39,26 @@
 //! You can use this package in your project by adding the following
 //! to your `Cargo.toml`:
 //!
+//! # features
+//!
+//! unicode-segmentation supports a `no_std` feature. This eliminates dependence on std,
+//! and instead uses equivalent functions from core.
+//!
 //! ```toml
 //! [dependencies]
-//! unicode-segmentation = "0.0.1"
+//! unicode-segmentation = "0.1.0"
 //! ```
 
 #![deny(missing_docs, unsafe_code)]
-#![feature(no_std, core, unicode)]
-#![no_std]
-#![cfg_attr(test, feature(str_char, collections))]
 
+#![cfg_attr(feature = "no_std", no_std)]
+#![cfg_attr(feature = "no_std", feature(no_std, core))]
+
+#[cfg(feature = "no_std")]
+#[macro_use]
 extern crate core;
-extern crate unicode;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "no_std"))]
 #[macro_use]
 extern crate std;
 
@@ -66,6 +72,8 @@ mod word;
 
 #[cfg(test)]
 mod test;
+#[cfg(test)]
+mod testdata;
 
 /// Methods for segmenting strings according to
 /// [Unicode Standard Annex #29](http://www.unicode.org/reports/tr29/).

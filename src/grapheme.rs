@@ -8,9 +8,14 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+#[cfg(feature = "no_std")]
 use core::prelude::*;
 
+#[cfg(feature = "no_std")]
 use core::cmp;
+
+#[cfg(not(feature = "no_std"))]
+use std::cmp;
 
 use tables::grapheme::GraphemeCat;
 
@@ -108,7 +113,7 @@ impl<'a> Iterator for Graphemes<'a> {
                 Start if '\r' == ch => {
                     let slen = self.string.len();
                     let nidx = idx + 1;
-                    if nidx != slen && self.string.char_at(nidx) == '\n' {
+                    if nidx != slen && self.string[nidx..].chars().next().unwrap() == '\n' {
                         idx = nidx;             // rule GB3
                     }
                     break;                      // rule GB4
@@ -160,7 +165,7 @@ impl<'a> Iterator for Graphemes<'a> {
         }
 
         self.cat = if take_curr {
-            idx = idx + self.string.char_at(idx).len_utf8();
+            idx = idx + self.string[idx..].chars().next().unwrap().len_utf8();
             None
         } else {
             Some(cat)
@@ -209,7 +214,7 @@ impl<'a> DoubleEndedIterator for Graphemes<'a> {
             // HangulLVT means the letter to the right is T
             state = match state {
                 Start if '\n' == ch => {
-                    if idx > 0 && '\r' == self.string.char_at_reverse(idx) {
+                    if idx > 0 && '\r' == self.string[..idx].chars().next_back().unwrap() {
                         idx -= 1;       // rule GB3
                     }
                     break;              // rule GB4

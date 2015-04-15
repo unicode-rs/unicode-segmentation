@@ -12,8 +12,8 @@
 # except according to those terms.
 
 # This script uses the following Unicode tables:
-# - GraphemeBreakTest.txt
-# - WordBreakTest.txt
+# - auxiliary/GraphemeBreakTest.txt
+# - auxiliary/WordBreakTest.txt
 #
 # Since this should not require frequent updates, we just store this
 # out-of-line and check the unicode.rs file into git.
@@ -139,7 +139,7 @@ def showfun(x):
     outstr += '])'
     return outstr
 
-def create_grapheme_data():
+def create_grapheme_data(f):
     # rules 9.1 and 9.2 are for extended graphemes only
     optsplits = ['9.1','9.2']
     d = load_test_data("auxiliary/GraphemeBreakTest.txt", optsplits)
@@ -169,15 +169,14 @@ def create_grapheme_data():
         else:
             test_diff.append((allchars, extgraphs, c))
 
-    stype = "&[(&str, &[&str])]"
-    dtype = "&[(&str, &[&str], &[&str])]"
-    with open("graph_tests.rs", "w") as rf:
-        rf.write("    // official Unicode test data\n")
-        rf.write("    // http://www.unicode.org/Public/UNIDATA/auxiliary/GraphemeBreakTest.txt\n")
-        unicode.emit_table(rf, "test_same", test_same, stype, False, showfun, False)
-        unicode.emit_table(rf, "test_diff", test_diff, dtype, False, showfun, False)
+    stype = "&'static [(&'static str, &'static [&'static str])]"
+    dtype = "&'static [(&'static str, &'static [&'static str], &'static [&'static str])]"
+    f.write("    // official Unicode test data\n")
+    f.write("    // http://www.unicode.org/Public/UNIDATA/auxiliary/GraphemeBreakTest.txt\n")
+    unicode.emit_table(f, "TEST_SAME", test_same, stype, True, showfun, True)
+    unicode.emit_table(f, "TEST_DIFF", test_diff, dtype, True, showfun, True)
 
-def create_words_data():
+def create_words_data(f):
     d = load_test_data("auxiliary/WordBreakTest.txt")
 
     test = []
@@ -186,12 +185,13 @@ def create_words_data():
         allchars = [cn for s in c for cn in s]
         test.append((allchars, c))
 
-    wtype = "&[(&str, &[&str])]"
-    with open("word_tests.rs", "w") as rf:
-        rf.write("    // official Unicode test data\n")
-        rf.write("    // http://www.unicode.org/Public/UNIDATA/auxiliary/WordBreakTest.txt\n")
-        unicode.emit_table(rf, "test_word", test, wtype, False, showfun, False)
+    wtype = "&'static [(&'static str, &'static [&'static str])]"
+    f.write("    // official Unicode test data\n")
+    f.write("    // http://www.unicode.org/Public/UNIDATA/auxiliary/WordBreakTest.txt\n")
+    unicode.emit_table(f, "TEST_WORD", test, wtype, True, showfun, True)
 
 if __name__ == "__main__":
-    create_grapheme_data()
-    create_words_data()
+    with open("testdata.rs", "w") as rf:
+        rf.write(unicode.preamble)
+        create_grapheme_data(rf)
+        create_words_data(rf)

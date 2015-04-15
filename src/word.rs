@@ -8,10 +8,18 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+#[cfg(feature = "no_std")]
 use core::prelude::*;
 
+#[cfg(feature = "no_std")]
 use core::cmp;
+#[cfg(feature = "no_std")]
 use core::iter::Filter;
+
+#[cfg(not(feature = "no_std"))]
+use std::cmp;
+#[cfg(not(feature = "no_std"))]
+use std::iter::Filter;
 
 use tables::word::WordCat;
 
@@ -260,7 +268,7 @@ impl<'a> Iterator for UWordBounds<'a> {
         }
 
         self.cat = if take_curr {
-            idx = idx + self.string.char_at(idx).len_utf8();
+            idx = idx + self.string[idx..].chars().next().unwrap().len_utf8();
             None
         } else if take_cat {
             Some(cat)
@@ -287,7 +295,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
         let mut take_curr = true;
         let mut take_cat = true;
         let mut idx = self.string.len();
-        idx -= self.string.char_at_reverse(idx).len_utf8();
+        idx -= self.string.chars().next_back().unwrap().len_utf8();
         let mut previdx = idx;
         let mut saveidx = idx;
         let mut state = Start;
@@ -458,9 +466,9 @@ impl<'a> UWordBounds<'a> {
     #[inline]
     fn get_next_cat(&self, idx: usize) -> Option<WordCat> {
         use tables::word as wd;
-        let nidx = idx + self.string.char_at(idx).len_utf8();
+        let nidx = idx + self.string[idx..].chars().next().unwrap().len_utf8();
         if nidx < self.string.len() {
-            let nch = self.string.char_at(nidx);
+            let nch = self.string[nidx..].chars().next().unwrap();
             Some(wd::word_category(nch))
         } else {
             None
@@ -471,7 +479,7 @@ impl<'a> UWordBounds<'a> {
     fn get_prev_cat(&self, idx: usize) -> Option<WordCat> {
         use tables::word as wd;
         if idx > 0 {
-            let nch = self.string.char_at_reverse(idx);
+            let nch = self.string[..idx].chars().next_back().unwrap();
             Some(wd::word_category(nch))
         } else {
             None
@@ -492,8 +500,9 @@ pub fn new_word_bound_indices<'b>(s: &'b str) -> UWordBoundIndices<'b> {
 #[inline]
 pub fn new_unicode_words<'b>(s: &'b str) -> UnicodeWords<'b> {
     use super::UnicodeSegmentation;
+    use tables::util::is_alphanumeric;
 
-    fn has_alphanumeric(s: &&str) -> bool { s.chars().any(|c| c.is_alphanumeric()) }
+    fn has_alphanumeric(s: &&str) -> bool { s.chars().any(|c| is_alphanumeric(c)) }
     let has_alphanumeric: fn(&&str) -> bool = has_alphanumeric; // coerce to fn pointer
 
     UnicodeWords { inner: s.split_word_bounds().filter(has_alphanumeric) }
