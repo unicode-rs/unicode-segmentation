@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright 2011-2013 The Rust Project Developers. See the COPYRIGHT
+# Copyright 2011-2015 The Rust Project Developers. See the COPYRIGHT
 # file at the top-level directory of this distribution and at
 # http://rust-lang.org/COPYRIGHT.
 #
@@ -20,7 +20,7 @@
 
 import fileinput, re, os, sys, operator
 
-preamble = '''// Copyright 2012-2014 The Rust Project Developers. See the COPYRIGHT
+preamble = '''// Copyright 2012-2015 The Rust Project Developers. See the COPYRIGHT
 // file at the top-level directory of this distribution and at
 // http://rust-lang.org/COPYRIGHT.
 //
@@ -215,7 +215,7 @@ if __name__ == "__main__":
             unicode_version = re.search(pattern, readme.read()).groups()
         rf.write("""
 /// The version of [Unicode](http://www.unicode.org/)
-/// that the unicode parts of `CharExt` and `UnicodeStrPrelude` traits are based on.
+/// that this version of unicode-segmentation is based on.
 pub const UNICODE_VERSION: (u64, u64, u64) = (%s, %s, %s);
 
 """ % unicode_version)

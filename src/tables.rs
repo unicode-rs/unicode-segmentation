@@ -1,4 +1,4 @@
-// Copyright 2012-2014 The Rust Project Developers. See the COPYRIGHT
+// Copyright 2012-2015 The Rust Project Developers. See the COPYRIGHT
 // file at the top-level directory of this distribution and at
 // http://rust-lang.org/COPYRIGHT.
 //
@@ -13,7 +13,7 @@
 #![allow(missing_docs, non_upper_case_globals, non_snake_case)]
 
 /// The version of [Unicode](http://www.unicode.org/)
-/// that the unicode parts of `CharExt` and `UnicodeStrPrelude` traits are based on.
+/// that this version of unicode-segmentation is based on.
 pub const UNICODE_VERSION: (u64, u64, u64) = (7, 0, 0);
 
 pub mod grapheme {
