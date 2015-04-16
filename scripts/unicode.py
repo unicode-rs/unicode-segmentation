@@ -150,8 +150,8 @@ def format_table_content(f, content, indent):
 def load_properties(f, interestingprops):
     fetch(f)
     props = {}
-    re1 = re.compile("^([0-9A-F]+) +; (\w+)")
-    re2 = re.compile("^([0-9A-F]+)\.\.([0-9A-F]+) +; (\w+)")
+    re1 = re.compile("^ *([0-9A-F]+) *; *(\w+)")
+    re2 = re.compile("^ *([0-9A-F]+)\.\.([0-9A-F]+) *; *(\w+)")
 
     for line in fileinput.input(os.path.basename(f)):
         prop = None
