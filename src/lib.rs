@@ -50,6 +50,8 @@
 //! ```
 
 #![deny(missing_docs, unsafe_code)]
+#![doc(html_logo_url = "https://unicode-rs.github.io/unicode-rs_sm.png",
+       html_favicon_url = "https://unicode-rs.github.io/unicode-rs_sm.png")]
 
 #![cfg_attr(feature = "no_std", no_std)]
 #![cfg_attr(feature = "no_std", feature(no_std, core))]
