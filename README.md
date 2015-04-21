@@ -3,6 +3,8 @@ to the [Unicode Standard Annex #29](http://www.unicode.org/reports/tr29/) rules.
 
 [![Build Status](https://travis-ci.org/unicode-rs/unicode-segmentation.svg)](https://travis-ci.org/unicode-rs/unicode-segmentation)
 
+[Documentation](https://unicode-rs.github.io/unicode-segmentation/unicode_segmentation/index.html)
+
 ```rust
 extern crate unicode_segmentation;
 
