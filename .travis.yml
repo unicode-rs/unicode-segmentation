@@ -1,4 +1,5 @@
 language: rust
+rust: 'nightly'
 sudo: false
 script:
   - cargo build --verbose --features no_std
