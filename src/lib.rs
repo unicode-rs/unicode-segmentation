@@ -133,6 +133,8 @@ pub trait UnicodeSegmentation {
     /// [General_Category=Number](http://unicode.org/reports/tr44/#General_Category_Values).
     ///
     /// # Example
+    ///
+    /// ```
     /// # use self::unicode_segmentation::UnicodeSegmentation;
     /// let uws = "The quick (\"brown\") fox can't jump 32.3 feet, right?";
     /// let uw1 = uws.unicode_words().collect::<Vec<&str>>();
