@@ -9,9 +9,6 @@
 // except according to those terms.
 
 #[cfg(feature = "no_std")]
-use core::prelude::*;
-
-#[cfg(feature = "no_std")]
 use core::cmp;
 
 #[cfg(not(feature = "no_std"))]
