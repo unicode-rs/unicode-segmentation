@@ -1,7 +1,7 @@
 [package]
 
 name = "unicode-segmentation"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["kwantam <kwantam@gmail.com>"]
 
 homepage = "https://github.com/unicode-rs/unicode-segmentation"
@@ -19,5 +19,4 @@ according to Unicode Standard Annex #29 rules.
 exclude = [ "target/*", "Cargo.lock", "scripts/tmp" ]
 
 [features]
-default = []
-no_std = []
+no_std = [] # This is a no-op, preserved for backward compatibility only.

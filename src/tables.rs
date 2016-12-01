@@ -19,13 +19,7 @@ pub const UNICODE_VERSION: (u64, u64, u64) = (8, 0, 0);
 pub mod util {
     #[inline]
     pub fn bsearch_range_table(c: char, r: &'static [(char,char)]) -> bool {
-        #[cfg(feature = "no_std")]
         use core::cmp::Ordering::{Equal, Less, Greater};
-        #[cfg(feature = "no_std")]
-        use core::slice::SliceExt;
-        
-        #[cfg(not(feature = "no_std"))]
-        use std::cmp::Ordering::{Equal, Less, Greater};
         r.binary_search_by(|&(lo,hi)| {
             if lo <= c && c <= hi { Equal }
             else if hi < c { Less }
@@ -285,9 +279,6 @@ mod derived_property {
 }
 
 pub mod grapheme {
-    #[cfg(feature = "no_std")]
-    use core::slice::SliceExt;
-    #[cfg(feature = "no_std")]
     use core::result::Result::{Ok, Err};
 
     pub use self::GraphemeCat::*;
@@ -308,10 +299,7 @@ pub mod grapheme {
     }
 
     fn bsearch_range_value_table(c: char, r: &'static [(char, char, GraphemeCat)]) -> GraphemeCat {
-        #[cfg(feature = "no_std")]
         use core::cmp::Ordering::{Equal, Less, Greater};
-        #[cfg(not(feature = "no_std"))]
-        use std::cmp::Ordering::{Equal, Less, Greater};
         match r.binary_search_by(|&(lo, hi, _)| {
             if lo <= c && c <= hi { Equal }
             else if hi < c { Less }
@@ -829,9 +817,6 @@ pub mod grapheme {
 }
 
 pub mod word {
-    #[cfg(feature = "no_std")]
-    use core::slice::SliceExt;
-    #[cfg(feature = "no_std")]
     use core::result::Result::{Ok, Err};
 
     pub use self::WordCat::*;
@@ -859,10 +844,7 @@ pub mod word {
     }
 
     fn bsearch_range_value_table(c: char, r: &'static [(char, char, WordCat)]) -> WordCat {
-        #[cfg(feature = "no_std")]
         use core::cmp::Ordering::{Equal, Less, Greater};
-        #[cfg(not(feature = "no_std"))]
-        use std::cmp::Ordering::{Equal, Less, Greater};
         match r.binary_search_by(|&(lo, hi, _)| {
             if lo <= c && c <= hi { Equal }
             else if hi < c { Less }

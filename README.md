@@ -28,10 +28,10 @@ fn main() {
 }
 ```
 
-# features
+# no_std
 
-unicode-segmentation supports a `no_std` feature. This eliminates dependence on std,
-and instead uses equivalent functions from core.
+unicode-segmentation does not depend on libstd, so it can be used in crates
+with the `#![no_std]` attribute.
 
 # crates.io
 

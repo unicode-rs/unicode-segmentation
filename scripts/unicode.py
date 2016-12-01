@@ -210,13 +210,7 @@ def emit_util_mod(f):
 pub mod util {
     #[inline]
     pub fn bsearch_range_table(c: char, r: &'static [(char,char)]) -> bool {
-        #[cfg(feature = "no_std")]
         use core::cmp::Ordering::{Equal, Less, Greater};
-        #[cfg(feature = "no_std")]
-        use core::slice::SliceExt;
-        
-        #[cfg(not(feature = "no_std"))]
-        use std::cmp::Ordering::{Equal, Less, Greater};
         r.binary_search_by(|&(lo,hi)| {
             if lo <= c && c <= hi { Equal }
             else if hi < c { Less }
@@ -263,9 +257,7 @@ def emit_property_module(f, mod, tbl, emit):
 def emit_break_module(f, break_table, break_cats, name):
     Name = name.capitalize()
     f.write("""pub mod %s {
-    #[cfg(feature = "no_std")]
     use core::slice::SliceExt;
-    #[cfg(feature = "no_std")]
     use core::result::Result::{Ok, Err};
 
     pub use self::%sCat::*;
@@ -282,10 +274,7 @@ def emit_break_module(f, break_table, break_cats, name):
     f.write("""    }
 
     fn bsearch_range_value_table(c: char, r: &'static [(char, char, %sCat)]) -> %sCat {
-        #[cfg(feature = "no_std")]
         use core::cmp::Ordering::{Equal, Less, Greater};
-        #[cfg(not(feature = "no_std"))]
-        use std::cmp::Ordering::{Equal, Less, Greater};
         match r.binary_search_by(|&(lo, hi, _)| {
             if lo <= c && c <= hi { Equal }
             else if hi < c { Less }

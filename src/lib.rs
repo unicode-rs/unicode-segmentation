@@ -34,15 +34,15 @@
 //! }
 //! ```
 //!
+//! # no_std
+//!
+//! unicode-segmentation does not depend on libstd, so it can be used in crates
+//! with the `#![no_std]` attribute.
+//!
 //! # crates.io
 //!
 //! You can use this package in your project by adding the following
 //! to your `Cargo.toml`:
-//!
-//! # features
-//!
-//! unicode-segmentation supports a `no_std` feature. This eliminates dependence on std,
-//! and instead uses equivalent functions from core.
 //!
 //! ```toml
 //! [dependencies]
@@ -53,10 +53,9 @@
 #![doc(html_logo_url = "https://unicode-rs.github.io/unicode-rs_sm.png",
        html_favicon_url = "https://unicode-rs.github.io/unicode-rs_sm.png")]
 
-#![cfg_attr(feature = "no_std", no_std)]
-#![cfg_attr(feature = "no_std", feature(no_std, core_char_ext, core_slice_ext, core_str_ext))]
+#![no_std]
 
-#[cfg(all(test, feature = "no_std"))]
+#[cfg(test)]
 #[macro_use]
 extern crate std;
 

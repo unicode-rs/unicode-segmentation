@@ -8,15 +8,8 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#[cfg(feature = "no_std")]
 use core::cmp;
-#[cfg(feature = "no_std")]
 use core::iter::Filter;
-
-#[cfg(not(feature = "no_std"))]
-use std::cmp;
-#[cfg(not(feature = "no_std"))]
-use std::iter::Filter;
 
 use tables::word::WordCat;
 

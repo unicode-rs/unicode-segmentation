@@ -10,7 +10,6 @@
 
 use super::UnicodeSegmentation;
 
-#[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
 #[test]

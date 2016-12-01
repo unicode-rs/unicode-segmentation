@@ -8,11 +8,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#[cfg(feature = "no_std")]
 use core::cmp;
-
-#[cfg(not(feature = "no_std"))]
-use std::cmp;
 
 use tables::grapheme::GraphemeCat;
 
