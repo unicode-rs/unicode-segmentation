@@ -51,7 +51,7 @@ pub struct Graphemes<'a> {
 }
 
 // state machine for cluster boundary rules
-#[derive(PartialEq,Eq)]
+#[derive(Copy,Clone,PartialEq,Eq)]
 enum GraphemeState {
     Start,
     FindExtend,
@@ -59,6 +59,7 @@ enum GraphemeState {
     HangulLV,
     HangulLVT,
     Regional,
+    Emoji,
     Zwj,
 }
 
@@ -94,6 +95,10 @@ impl<'a> Iterator for Graphemes<'a> {
                 _ => self.cat.take().unwrap()
             };
 
+            if (state, cat) == (Emoji, gr::GC_Extend) {
+                continue;                   // rule GB10
+            }
+
             if let Some(new_state) = match cat {
                 gr::GC_Extend => Some(FindExtend),                       // rule GB9
                 gr::GC_SpacingMark if self.extended => Some(FindExtend), // rule GB9a
@@ -119,6 +124,7 @@ impl<'a> Iterator for Graphemes<'a> {
                     gr::GC_LV | gr::GC_V => HangulLV,
                     gr::GC_LVT | gr::GC_T => HangulLVT,
                     gr::GC_Regional_Indicator => Regional,
+                    gr::GC_E_Base | gr::GC_E_Base_GAZ => Emoji,
                     _ => FindExtend
                 },
                 FindExtend => {         // found non-extending when looking for extending
@@ -156,8 +162,16 @@ impl<'a> Iterator for Graphemes<'a> {
                         break;
                     }
                 },
+                Emoji => match cat {        // rule GB10: (E_Base|EBG) Extend* x E_Modifier
+                    gr::GC_E_Modifier => continue,
+                    _ => {
+                        take_curr = false;
+                        break;
+                    }
+                },
                 Zwj => match cat {          // rule GB11: ZWJ x (GAZ|EBG)
-                    gr::GC_Glue_After_Zwj | gr::GC_E_Base_GAZ => continue,
+                    gr::GC_Glue_After_Zwj => continue,
+                    gr::GC_E_Base_GAZ => Emoji,
                     _ => {
                         take_curr = false;
                         break;
@@ -193,7 +207,8 @@ impl<'a> DoubleEndedIterator for Graphemes<'a> {
         let mut previdx = idx;
         let mut state = Start;
         let mut cat = gr::GC_Any;
-        for (curr, ch) in self.string.char_indices().rev() {
+
+        'outer: for (curr, ch) in self.string.char_indices().rev() {
             previdx = idx;
             idx = curr;
 
@@ -225,6 +240,7 @@ impl<'a> DoubleEndedIterator for Graphemes<'a> {
                     gr::GC_Extend => FindExtend,
                     gr::GC_SpacingMark if self.extended => FindExtend,
                     gr::GC_ZWJ => FindExtend,
+                    gr::GC_E_Modifier => Emoji,
                     gr::GC_Glue_After_Zwj | gr::GC_E_Base_GAZ => Zwj,
                     gr::GC_L | gr::GC_LV | gr::GC_LVT => HangulL,
                     gr::GC_V => HangulLV,
@@ -266,6 +282,38 @@ impl<'a> DoubleEndedIterator for Graphemes<'a> {
                         take_curr = false;
                         break;
                     }
+                },
+                Emoji => {                  // char to right is E_Modifier
+                    // In order to decide whether to break before this E_Modifier char, we need to
+                    // scan backward past any Extend chars to look for (E_Base|(ZWJ? EBG)).
+                    let mut ebg_idx = None;
+                    for (startidx, prev) in self.string[..previdx].char_indices().rev() {
+                        match (ebg_idx, gr::grapheme_category(prev)) {
+                            (None, gr::GC_Extend) => continue,
+                            (None, gr::GC_E_Base) => {      // rule GB10
+                                // Found an Emoji modifier sequence. Return the whole sequence.
+                                idx = startidx;
+                                break 'outer;
+                            }
+                            (None, gr::GC_E_Base_GAZ) => {  // rule GB10
+                                // Keep scanning in case this is part of an ZWJ x EBJ pair.
+                                ebg_idx = Some(startidx);
+                            }
+                            (Some(_), gr::GC_ZWJ) => {      // rule GB11
+                                idx = startidx;
+                                break 'outer;
+                            }
+                            _ => break
+                        }
+                    }
+                    if let Some(ebg_idx) = ebg_idx {
+                        // Found an EBG without a ZWJ before it.
+                        idx = ebg_idx;
+                        break;
+                    }
+                    // Not part of an Emoji modifier sequence. Break here.
+                    take_curr = false;
+                    break;
                 },
                 Zwj => match cat {          // char to right is (GAZ|EBG)
                     gr::GC_ZWJ => continue, // rule GB11: ZWJ x (GAZ|EBG)
