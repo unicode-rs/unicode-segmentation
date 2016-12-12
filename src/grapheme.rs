@@ -58,6 +58,7 @@ enum GraphemeState {
     HangulL,
     HangulLV,
     HangulLVT,
+    Prepend,
     Regional,
     Emoji,
     Zwj,
@@ -123,6 +124,7 @@ impl<'a> Iterator for Graphemes<'a> {
                     gr::GC_L => HangulL,
                     gr::GC_LV | gr::GC_V => HangulLV,
                     gr::GC_LVT | gr::GC_T => HangulLVT,
+                    gr::GC_Prepend if self.extended => Prepend,
                     gr::GC_Regional_Indicator => Regional,
                     gr::GC_E_Base | gr::GC_E_Base_GAZ => Emoji,
                     _ => FindExtend
@@ -154,6 +156,13 @@ impl<'a> Iterator for Graphemes<'a> {
                         take_curr = false;
                         break;
                     }
+                },
+                Prepend => match cat {      // rule GB9b
+                    gr::GC_Control => {
+                        take_curr = false;
+                        break;
+                    }
+                    _ => continue
                 },
                 Regional => match cat {     // rule GB12/GB13
                     gr::GC_Regional_Indicator => FindExtend,
@@ -276,6 +285,10 @@ impl<'a> DoubleEndedIterator for Graphemes<'a> {
                         break;
                     }
                 },
+                Prepend => {
+                    // not used in reverse iteration
+                    unreachable!()
+                },
                 Regional => {               // rule GB12/GB13
                     // Need to scan backward to find if this is preceded by an odd or even number
                     // of Regional_Indicator characters.
@@ -339,6 +352,17 @@ impl<'a> DoubleEndedIterator for Graphemes<'a> {
             idx = previdx;
             Some(cat)
         };
+
+        if self.extended && cat != gr::GC_Control {
+            // rule GB9b: include any preceding Prepend characters
+            for (i, c) in self.string[..idx].char_indices().rev() {
+                // TODO: Cache this to avoid repeated lookups in the common case.
+                match gr::grapheme_category(c) {
+                    gr::GC_Prepend => idx = i,
+                    _ => break
+                }
+            }
+        }
 
         let retstr = &self.string[idx..];
         self.string = &self.string[..idx];
