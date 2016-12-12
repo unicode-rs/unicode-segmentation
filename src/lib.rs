@@ -96,7 +96,7 @@ pub trait UnicodeSegmentation {
     /// assert_eq!(&gr1[..], b);
     ///
     /// let gr2 = UnicodeSegmentation::graphemes("a\r\nb🇷🇺🇸🇹", true).collect::<Vec<&str>>();
-    /// let b: &[_] = &["a", "\r\n", "b", "🇷🇺🇸🇹"];
+    /// let b: &[_] = &["a", "\r\n", "b", "🇷🇺", "🇸🇹"];
     ///
     /// assert_eq!(&gr2[..], b);
     /// ```

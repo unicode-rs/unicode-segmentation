@@ -155,8 +155,8 @@ impl<'a> Iterator for Graphemes<'a> {
                         break;
                     }
                 },
-                Regional => match cat {     // rule GB8a
-                    gr::GC_Regional_Indicator => continue,
+                Regional => match cat {     // rule GB12/GB13
+                    gr::GC_Regional_Indicator => FindExtend,
                     _ => {
                         take_curr = false;
                         break;
@@ -276,12 +276,20 @@ impl<'a> DoubleEndedIterator for Graphemes<'a> {
                         break;
                     }
                 },
-                Regional => match cat {     // rule GB8a
-                    gr::GC_Regional_Indicator => continue,
-                    _ => {
+                Regional => {               // rule GB12/GB13
+                    // Need to scan backward to find if this is preceded by an odd or even number
+                    // of Regional_Indicator characters.
+                    //
+                    // TODO: Save this state to avoid O(n^2) re-scanning in long RI sequences?
+                    let prev_chars = self.string[..previdx].chars().rev();
+                    let count = prev_chars.take_while(|c| {
+                        gr::grapheme_category(*c) == gr::GC_Regional_Indicator
+                    }).count();
+                    if count % 2 == 0 {
                         take_curr = false;
                         break;
                     }
+                    continue;
                 },
                 Emoji => {                  // char to right is E_Modifier
                     // In order to decide whether to break before this E_Modifier char, we need to
