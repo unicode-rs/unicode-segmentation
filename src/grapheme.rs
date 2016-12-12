@@ -59,6 +59,7 @@ enum GraphemeState {
     HangulLV,
     HangulLVT,
     Regional,
+    Zwj,
 }
 
 impl<'a> Iterator for Graphemes<'a> {
@@ -93,13 +94,14 @@ impl<'a> Iterator for Graphemes<'a> {
                 _ => self.cat.take().unwrap()
             };
 
-            if match cat {
-                gr::GC_Extend => true,
-                gr::GC_SpacingMark if self.extended => true,
-                _ => false
+            if let Some(new_state) = match cat {
+                gr::GC_Extend => Some(FindExtend),                       // rule GB9
+                gr::GC_SpacingMark if self.extended => Some(FindExtend), // rule GB9a
+                gr::GC_ZWJ => Some(Zwj),                                 // rule GB9/GB11
+                _ => None
             } {
-                    state = FindExtend;     // rule GB9/GB9a
-                    continue;
+                state = new_state;
+                continue;
             }
 
             state = match state {
@@ -153,7 +155,14 @@ impl<'a> Iterator for Graphemes<'a> {
                         take_curr = false;
                         break;
                     }
-                }
+                },
+                Zwj => match cat {          // rule GB11: ZWJ x (GAZ|EBG)
+                    gr::GC_Glue_After_Zwj | gr::GC_E_Base_GAZ => continue,
+                    _ => {
+                        take_curr = false;
+                        break;
+                    }
+                },
             }
         }
 
@@ -215,6 +224,8 @@ impl<'a> DoubleEndedIterator for Graphemes<'a> {
                 Start | FindExtend => match cat {
                     gr::GC_Extend => FindExtend,
                     gr::GC_SpacingMark if self.extended => FindExtend,
+                    gr::GC_ZWJ => FindExtend,
+                    gr::GC_Glue_After_Zwj | gr::GC_E_Base_GAZ => Zwj,
                     gr::GC_L | gr::GC_LV | gr::GC_LVT => HangulL,
                     gr::GC_V => HangulLV,
                     gr::GC_T => HangulLVT,
@@ -251,6 +262,13 @@ impl<'a> DoubleEndedIterator for Graphemes<'a> {
                 },
                 Regional => match cat {     // rule GB8a
                     gr::GC_Regional_Indicator => continue,
+                    _ => {
+                        take_curr = false;
+                        break;
+                    }
+                },
+                Zwj => match cat {          // char to right is (GAZ|EBG)
+                    gr::GC_ZWJ => continue, // rule GB11: ZWJ x (GAZ|EBG)
                     _ => {
                         take_curr = false;
                         break;
