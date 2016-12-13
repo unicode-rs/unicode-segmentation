@@ -171,7 +171,7 @@ impl<'a> Iterator for UWordBounds<'a> {
                                 continue;
                             }
                         }
-                        break;                                                      // rule WB14
+                        break;                                                      // rule WB999
                     }
                 },
                 Zwj => match cat {                              // rule WB3c
@@ -368,7 +368,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                         }
                         break;                                              // rule WB3a
                     },
-                    _ => break                              // rule WB14
+                    _ => break                              // rule WB999
                 },
                 Zwj => match cat {                          // rule WB3c
                     wd::WC_ZWJ => continue,
