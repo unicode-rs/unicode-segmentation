@@ -82,6 +82,7 @@ enum UWordBoundsState {
     ExtendNumLet,
     Regional,
     FormatExtend(FormatExtendType),
+    Zwj,
 }
 
 // subtypes for FormatExtend state in UWordBoundsState
@@ -138,8 +139,11 @@ impl<'a> Iterator for UWordBounds<'a> {
             // (This is not obvious from the wording of UAX#29, but if you look at the
             // test cases http://www.unicode.org/Public/UNIDATA/auxiliary/WordBreakTest.txt
             // then the "correct" interpretation of WB4 becomes apparent.)
-            if state != Start && (cat == wd::WC_Extend || cat == wd::WC_Format) {
-                continue;
+            if state != Start {
+                match cat {
+                    wd::WC_Extend | wd::WC_Format | wd::WC_ZWJ => continue,
+                    _ => {}
+                }
             }
 
             state = match state {
@@ -158,15 +162,23 @@ impl<'a> Iterator for UWordBounds<'a> {
                     wd::WC_ExtendNumLet => ExtendNumLet,    // rule WB13a, WB13b
                     wd::WC_Regional_Indicator => Regional,  // rule WB13c
                     wd::WC_LF | wd::WC_Newline => break,    // rule WB3a
+                    wd::WC_ZWJ => Zwj,                      // rule WB3c
                     _ => {
                         if let Some(ncat) = self.get_next_cat(idx) {                // rule WB4
-                            if ncat == wd::WC_Format || ncat == wd::WC_Extend {
+                            if ncat == wd::WC_Format || ncat == wd::WC_Extend || ncat == wd::WC_ZWJ {
                                 state = FormatExtend(AcceptNone);
                                 self.cat = Some(ncat);
                                 continue;
                             }
                         }
                         break;                                                      // rule WB14
+                    }
+                },
+                Zwj => match cat {                              // rule WB3c
+                    wd::WC_Glue_After_Zwj | wd::WC_E_Base_GAZ => continue,
+                    _ => {
+                        take_curr = false;
+                        break;
                     }
                 },
                 Letter | HLetter => match cat {
@@ -336,7 +348,9 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                     wd::WC_Katakana => Katakana,                    // rule WB13, WB13b
                     wd::WC_ExtendNumLet => ExtendNumLet,                    // rule WB13a
                     wd::WC_Regional_Indicator => Regional,                  // rule WB13c
-                    wd::WC_Extend | wd::WC_Format => FormatExtend(AcceptAny),   // rule WB4
+                    wd::WC_Glue_After_Zwj | wd::WC_E_Base_GAZ => Zwj,       // rule WB3c
+                    // rule WB4:
+                    wd::WC_Extend | wd::WC_Format | wd::WC_ZWJ => FormatExtend(AcceptAny),
                     wd::WC_Single_Quote => {
                         saveidx = idx;
                         FormatExtend(AcceptQLetter)                         // rule WB7a
@@ -355,6 +369,13 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                         break;                                              // rule WB3a
                     },
                     _ => break                              // rule WB14
+                },
+                Zwj => match cat {                          // rule WB3c
+                    wd::WC_ZWJ => continue,
+                    _ => {
+                        take_curr = false;
+                        break;
+                    }
                 },
                 Letter | HLetter => match cat {
                     wd::WC_ALetter => Letter,               // rule WB5
