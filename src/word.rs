@@ -83,6 +83,7 @@ enum UWordBoundsState {
     Regional,
     FormatExtend(FormatExtendType),
     Zwj,
+    Emoji,
 }
 
 // subtypes for FormatExtend state in UWordBoundsState
@@ -163,6 +164,7 @@ impl<'a> Iterator for UWordBounds<'a> {
                     wd::WC_Regional_Indicator => Regional,  // rule WB13c
                     wd::WC_LF | wd::WC_Newline => break,    // rule WB3a
                     wd::WC_ZWJ => Zwj,                      // rule WB3c
+                    wd::WC_E_Base | wd::WC_E_Base_GAZ => Emoji, // rule WB14
                     _ => {
                         if let Some(ncat) = self.get_next_cat(idx) {                // rule WB4
                             if ncat == wd::WC_Format || ncat == wd::WC_Extend || ncat == wd::WC_ZWJ {
@@ -240,6 +242,13 @@ impl<'a> Iterator for UWordBounds<'a> {
                 },
                 Regional => match cat {
                     wd::WC_Regional_Indicator => Regional,      // rule WB13c
+                    _ => {
+                        take_curr = false;
+                        break;
+                    }
+                },
+                Emoji => match cat {                            // rule WB14
+                    wd::WC_E_Modifier => continue,
                     _ => {
                         take_curr = false;
                         break;
@@ -355,6 +364,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                         saveidx = idx;
                         FormatExtend(AcceptQLetter)                         // rule WB7a
                     },
+                    wd::WC_E_Modifier => Emoji,                             // rule WB14
                     wd::WC_CR | wd::WC_LF | wd::WC_Newline => {
                         if state == Start {
                             if cat == wd::WC_LF {
@@ -430,6 +440,13 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                 },
                 Regional => match cat {
                     wd::WC_Regional_Indicator => Regional,  // rule WB13c
+                    _ => {
+                        take_curr = false;
+                        break;
+                    }
+                },
+                Emoji => match cat {                            // rule WB14
+                    wd::WC_E_Base | wd::WC_E_Base_GAZ => continue,
                     _ => {
                         take_curr = false;
                         break;
