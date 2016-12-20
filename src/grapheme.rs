@@ -223,6 +223,9 @@ impl<'a> DoubleEndedIterator for Graphemes<'a> {
         let mut state = Start;
         let mut cat = gr::GC_Any;
 
+        // caching used by next() should be invalidated
+        self.cat = None;
+
         'outer: for (curr, ch) in self.string.char_indices().rev() {
             previdx = idx;
             idx = curr;
@@ -365,10 +368,12 @@ impl<'a> DoubleEndedIterator for Graphemes<'a> {
         if self.extended && cat != gr::GC_Control {
             // rule GB9b: include any preceding Prepend characters
             for (i, c) in self.string[..idx].char_indices().rev() {
-                // TODO: Cache this to avoid repeated lookups in the common case.
                 match gr::grapheme_category(c) {
                     gr::GC_Prepend => idx = i,
-                    _ => break
+                    cat => {
+                        self.catb = Some(cat);
+                        break;
+                    }
                 }
             }
         }

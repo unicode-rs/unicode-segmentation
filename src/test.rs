@@ -16,6 +16,15 @@ use std::prelude::v1::*;
 fn test_graphemes() {
     use testdata::{TEST_SAME, TEST_DIFF};
 
+    pub const EXTRA_DIFF: &'static [(&'static str,
+                                     &'static [&'static str],
+                                     &'static [&'static str])] = &[
+        // Official test suite doesn't include two Prepend chars between two other chars.
+        ("\u{20}\u{600}\u{600}\u{20}",
+         &["\u{20}", "\u{600}\u{600}\u{20}"],
+         &["\u{20}", "\u{600}", "\u{600}", "\u{20}"]),
+    ];
+
     for &(s, g) in TEST_SAME {
         // test forward iterator
         assert!(UnicodeSegmentation::graphemes(s, true)
@@ -34,11 +43,11 @@ fn test_graphemes() {
                 .all(|(a,b)| a == b));
     }
 
-    for &(s, gt, gf) in TEST_DIFF {
+    for &(s, gt, gf) in TEST_DIFF.iter().chain(EXTRA_DIFF) {
         // test forward iterator
         assert!(UnicodeSegmentation::graphemes(s, true)
                 .zip(gt.iter().cloned())
-                .all(|(a,b)| a == b));
+                .all(|(a,b)| a == b), "{:?}", s);
         assert!(UnicodeSegmentation::graphemes(s, false)
                 .zip(gf.iter().cloned())
                 .all(|(a,b)| a == b));
