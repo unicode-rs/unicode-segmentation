@@ -868,7 +868,7 @@ pub mod word {
     pub use self::WordCat::*;
 
     #[allow(non_camel_case_types)]
-    #[derive(Clone, Copy, PartialEq, Eq)]
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
     pub enum WordCat {
         WC_ALetter,
         WC_Any,

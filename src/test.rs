@@ -92,13 +92,16 @@ fn test_words() {
     use testdata::TEST_WORD;
 
     for &(s, w) in TEST_WORD {
+        macro_rules! assert_ {
+            ($x:expr) => (assert!($x, "Word test {} for testcase ({:?}, {:?}) failed", stringify!($x), s, w))
+        }
         // test forward iterator
-        assert!(s.split_word_bounds()
+        assert_!(s.split_word_bounds()
                 .zip(w.iter().cloned())
                 .all(|(a,b)| a == b));
 
         // test reverse iterator
-        assert!(s.split_word_bounds().rev()
+        assert_!(s.split_word_bounds().rev()
                 .zip(w.iter().rev().cloned())
                 .all(|(a,b)| a == b));
 
@@ -111,12 +114,12 @@ fn test_words() {
         let indices = indices;
 
         // test forward indices iterator
-        assert!(s.split_word_bound_indices()
+        assert_!(s.split_word_bound_indices()
                  .zip(indices.iter())
                  .all(|((l,_),m)| l == *m));
 
         // test backward indices iterator
-        assert!(s.split_word_bound_indices().rev()
+        assert_!(s.split_word_bound_indices().rev()
                  .zip(indices.iter().rev())
                  .all(|((l,_),m)| l == *m));
     }

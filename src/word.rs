@@ -72,7 +72,7 @@ impl<'a> DoubleEndedIterator for UWordBoundIndices<'a> {
 }
 
 // state machine for word boundary rules
-#[derive(Clone,Copy,PartialEq,Eq)]
+#[derive(Clone,Copy,PartialEq,Eq,Debug)]
 enum UWordBoundsState {
     Start,
     Letter,
@@ -82,12 +82,12 @@ enum UWordBoundsState {
     ExtendNumLet,
     Regional,
     FormatExtend(FormatExtendType),
-    Zwj,
+    Zwj(bool),
     Emoji,
 }
 
 // subtypes for FormatExtend state in UWordBoundsState
-#[derive(Clone,Copy,PartialEq,Eq)]
+#[derive(Clone,Copy,PartialEq,Eq,Debug)]
 enum FormatExtendType {
     AcceptAny,
     AcceptNone,
@@ -122,6 +122,7 @@ impl<'a> Iterator for UWordBounds<'a> {
         let mut state = Start;
         let mut cat = wd::WC_Any;
         let mut savecat = wd::WC_Any;
+
         for (curr, ch) in self.string.char_indices() {
             idx = curr;
 
@@ -140,9 +141,31 @@ impl<'a> Iterator for UWordBounds<'a> {
             // (This is not obvious from the wording of UAX#29, but if you look at the
             // test cases http://www.unicode.org/Public/UNIDATA/auxiliary/WordBreakTest.txt
             // then the "correct" interpretation of WB4 becomes apparent.)
+            //
+            // WB4 makes all ZWJs collapse into the previous state
+            // but you can still be in a Zwj state if you started with Zwj
+            //
+            // This means that Zwj + Extend will collapse into Zwj, which is wrong,
+            // since Extend has a boundary with following EBG/GAZ chars but ZWJ doesn't,
+            // and that rule (WB3c) has higher priority
+            //
+            // Thus, when in the Zwj state, we track if the last collapsed character is also
+            // a ZWJ. If it isn't, we treat that as a "tainted" zwj, which is basically
+            // of the form ZWJ (Format | Extend | ZWJ)* (Format | Extend).
             if state != Start {
                 match cat {
-                    wd::WC_Extend | wd::WC_Format | wd::WC_ZWJ => continue,
+                    wd::WC_Extend | wd::WC_Format => {
+                        if let Zwj(ref mut taint) = state {
+                            *taint = true;
+                        }
+                        continue
+                    }
+                    wd::WC_ZWJ => {
+                        if let Zwj(ref mut taint) = state {
+                            *taint = false;
+                        }
+                        continue
+                    }
                     _ => {}
                 }
             }
@@ -163,7 +186,7 @@ impl<'a> Iterator for UWordBounds<'a> {
                     wd::WC_ExtendNumLet => ExtendNumLet,    // rule WB13a, WB13b
                     wd::WC_Regional_Indicator => Regional,  // rule WB13c
                     wd::WC_LF | wd::WC_Newline => break,    // rule WB3a
-                    wd::WC_ZWJ => Zwj,                      // rule WB3c
+                    wd::WC_ZWJ => Zwj(false),                      // rule WB3c
                     wd::WC_E_Base | wd::WC_E_Base_GAZ => Emoji, // rule WB14
                     _ => {
                         if let Some(ncat) = self.get_next_cat(idx) {                // rule WB4
@@ -176,8 +199,14 @@ impl<'a> Iterator for UWordBounds<'a> {
                         break;                                                      // rule WB999
                     }
                 },
-                Zwj => match cat {                              // rule WB3c
-                    wd::WC_Glue_After_Zwj | wd::WC_E_Base_GAZ => continue,
+                Zwj(true) => {
+                    take_curr = false;
+                    break
+                }
+                Zwj(false) => match cat {                              // rule WB3c
+                    wd::WC_Glue_After_Zwj | wd::WC_E_Base_GAZ => {
+                        continue;
+                    },
                     _ => {
                         take_curr = false;
                         break;
@@ -329,7 +358,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
             //     Hebrew Letter immediately before it.
             // (2) Format and Extend char handling takes some gymnastics.
 
-            if cat == wd::WC_Extend || cat == wd::WC_Format {
+            if cat == wd::WC_Extend || cat == wd::WC_Format || cat == wd::WC_ZWJ {
                 if match state {
                     FormatExtend(_) | Start => false,
                     _ => true
@@ -357,7 +386,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                     wd::WC_Katakana => Katakana,                    // rule WB13, WB13b
                     wd::WC_ExtendNumLet => ExtendNumLet,                    // rule WB13a
                     wd::WC_Regional_Indicator => Regional,                  // rule WB13c
-                    wd::WC_Glue_After_Zwj | wd::WC_E_Base_GAZ => Zwj,       // rule WB3c
+                    wd::WC_Glue_After_Zwj | wd::WC_E_Base_GAZ => Zwj(false),       // rule WB3c
                     // rule WB4:
                     wd::WC_Extend | wd::WC_Format | wd::WC_ZWJ => FormatExtend(AcceptAny),
                     wd::WC_Single_Quote => {
@@ -380,7 +409,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                     },
                     _ => break                              // rule WB999
                 },
-                Zwj => match cat {                          // rule WB3c
+                Zwj(_) => match cat {                          // rule WB3c
                     wd::WC_ZWJ => continue,
                     _ => {
                         take_curr = false;
