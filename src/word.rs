@@ -80,9 +80,9 @@ enum UWordBoundsState {
     Numeric,
     Katakana,
     ExtendNumLet,
-    Regional,
+    Regional(/* half */ bool),
     FormatExtend(FormatExtendType),
-    Zwj(bool),
+    Zwj(/* tainted */ bool),
     Emoji,
 }
 
@@ -184,7 +184,7 @@ impl<'a> Iterator for UWordBounds<'a> {
                     wd::WC_Numeric => Numeric,          // rule WB8, WB10, WB12, WB13a
                     wd::WC_Katakana => Katakana,        // rule WB13, WB13a
                     wd::WC_ExtendNumLet => ExtendNumLet,    // rule WB13a, WB13b
-                    wd::WC_Regional_Indicator => Regional,  // rule WB13c
+                    wd::WC_Regional_Indicator => Regional(/* half = */ true),  // rule WB13c
                     wd::WC_LF | wd::WC_Newline => break,    // rule WB3a
                     wd::WC_ZWJ => Zwj(false),                      // rule WB3c
                     wd::WC_E_Base | wd::WC_E_Base_GAZ => Emoji, // rule WB14
@@ -269,8 +269,15 @@ impl<'a> Iterator for UWordBounds<'a> {
                         break;
                     }
                 },
-                Regional => match cat {
-                    wd::WC_Regional_Indicator => Regional,      // rule WB13c
+                Regional(false) => {
+                    // if it reaches here we've gone too far,
+                    // a full flag can only compose with ZWJ/Extend/Format
+                    // proceeding it.
+                    take_curr = false;
+                    break;
+                }
+                Regional(/* half */ true) => match cat {
+                    wd::WC_Regional_Indicator => Regional(false),      // rule WB13c
                     _ => {
                         take_curr = false;
                         break;
@@ -385,7 +392,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                     wd::WC_Numeric => Numeric,          // rule WB8, WB9, WB11, WB13b
                     wd::WC_Katakana => Katakana,                    // rule WB13, WB13b
                     wd::WC_ExtendNumLet => ExtendNumLet,                    // rule WB13a
-                    wd::WC_Regional_Indicator => Regional,                  // rule WB13c
+                    wd::WC_Regional_Indicator => Regional(true),                  // rule WB13c
                     wd::WC_Glue_After_Zwj | wd::WC_E_Base_GAZ => Zwj(false),       // rule WB3c
                     // rule WB4:
                     wd::WC_Extend | wd::WC_Format | wd::WC_ZWJ => FormatExtend(AcceptAny),
@@ -467,8 +474,8 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                         break;
                     }
                 },
-                Regional => match cat {
-                    wd::WC_Regional_Indicator => Regional,  // rule WB13c
+                Regional(_) => match cat {
+                    wd::WC_Regional_Indicator => Regional(true),  // rule WB13c
                     _ => {
                         take_curr = false;
                         break;
