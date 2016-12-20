@@ -93,17 +93,22 @@ fn test_words() {
 
     for &(s, w) in TEST_WORD {
         macro_rules! assert_ {
-            ($x:expr) => (assert!($x, "Word test {} for testcase ({:?}, {:?}) failed", stringify!($x), s, w))
+            ($test:expr, $exp:expr, $name:expr) => {
+                // collect into vector for better diagnostics in failure case
+                let testing = $test.collect::<Vec<_>>();
+                let expected = $exp.collect::<Vec<_>>();
+                assert_eq!(testing, expected, "{} test for testcase ({:?}, {:?}) failed.", $name, s, w)
+            }
         }
         // test forward iterator
-        assert_!(s.split_word_bounds()
-                .zip(w.iter().cloned())
-                .all(|(a,b)| a == b));
+        assert_!(s.split_word_bounds(),
+                w.iter().cloned(),
+                "Forward word boundaries");
 
         // test reverse iterator
-        assert_!(s.split_word_bounds().rev()
-                .zip(w.iter().rev().cloned())
-                .all(|(a,b)| a == b));
+        assert_!(s.split_word_bounds().rev(),
+                w.iter().rev().cloned(),
+                "Reverse word boundaries");
 
         // generate offsets from word string lengths
         let mut indices = vec![0];
@@ -114,13 +119,13 @@ fn test_words() {
         let indices = indices;
 
         // test forward indices iterator
-        assert_!(s.split_word_bound_indices()
-                 .zip(indices.iter())
-                 .all(|((l,_),m)| l == *m));
+        assert_!(s.split_word_bound_indices().map(|(l,_)| l),
+                 indices.iter().cloned(),
+                 "Forward word indices");
 
         // test backward indices iterator
-        assert_!(s.split_word_bound_indices().rev()
-                 .zip(indices.iter().rev())
-                 .all(|((l,_),m)| l == *m));
+        assert_!(s.split_word_bound_indices().rev().map(|(l,_)| l),
+                 indices.iter().rev().cloned(),
+                 "Reverse word indices");
     }
 }

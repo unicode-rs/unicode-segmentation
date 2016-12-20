@@ -80,7 +80,7 @@ enum UWordBoundsState {
     Numeric,
     Katakana,
     ExtendNumLet,
-    Regional(/* half */ bool),
+    Regional(RegionalState),
     FormatExtend(FormatExtendType),
     Zwj(/* tainted */ bool),
     Emoji,
@@ -95,6 +95,13 @@ enum FormatExtendType {
     RequireHLetter,
     AcceptQLetter,
     RequireNumeric,
+}
+
+#[derive(Clone,Copy,PartialEq,Eq,Debug)]
+enum RegionalState {
+    Half,
+    Full,
+    Unknown,
 }
 
 impl<'a> Iterator for UWordBounds<'a> {
@@ -184,7 +191,7 @@ impl<'a> Iterator for UWordBounds<'a> {
                     wd::WC_Numeric => Numeric,          // rule WB8, WB10, WB12, WB13a
                     wd::WC_Katakana => Katakana,        // rule WB13, WB13a
                     wd::WC_ExtendNumLet => ExtendNumLet,    // rule WB13a, WB13b
-                    wd::WC_Regional_Indicator => Regional(/* half = */ true),  // rule WB13c
+                    wd::WC_Regional_Indicator => Regional(RegionalState::Half),  // rule WB13c
                     wd::WC_LF | wd::WC_Newline => break,    // rule WB3a
                     wd::WC_ZWJ => Zwj(false),                      // rule WB3c
                     wd::WC_E_Base | wd::WC_E_Base_GAZ => Emoji, // rule WB14
@@ -269,20 +276,21 @@ impl<'a> Iterator for UWordBounds<'a> {
                         break;
                     }
                 },
-                Regional(false) => {
+                Regional(RegionalState::Full) => {
                     // if it reaches here we've gone too far,
                     // a full flag can only compose with ZWJ/Extend/Format
                     // proceeding it.
                     take_curr = false;
                     break;
                 }
-                Regional(/* half */ true) => match cat {
-                    wd::WC_Regional_Indicator => Regional(false),      // rule WB13c
+                Regional(RegionalState::Half) => match cat {
+                    wd::WC_Regional_Indicator => Regional(RegionalState::Full),      // rule WB13c
                     _ => {
                         take_curr = false;
                         break;
                     }
                 },
+                Regional(_) => unreachable!("RegionalState::Unknown should not occur on forward iteration"),
                 Emoji => match cat {                            // rule WB14
                     wd::WC_E_Modifier => continue,
                     _ => {
@@ -392,7 +400,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                     wd::WC_Numeric => Numeric,          // rule WB8, WB9, WB11, WB13b
                     wd::WC_Katakana => Katakana,                    // rule WB13, WB13b
                     wd::WC_ExtendNumLet => ExtendNumLet,                    // rule WB13a
-                    wd::WC_Regional_Indicator => Regional(true),                  // rule WB13c
+                    wd::WC_Regional_Indicator => Regional(RegionalState::Unknown), // rule WB13c
                     wd::WC_Glue_After_Zwj | wd::WC_E_Base_GAZ => Zwj(false),       // rule WB3c
                     // rule WB4:
                     wd::WC_Extend | wd::WC_Format | wd::WC_ZWJ => FormatExtend(AcceptAny),
@@ -474,8 +482,31 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                         break;
                     }
                 },
-                Regional(_) => match cat {
-                    wd::WC_Regional_Indicator => Regional(true),  // rule WB13c
+                Regional(mut regional_state) => match cat {
+                    // rule WB13c
+                    wd::WC_Regional_Indicator => {
+                        if regional_state == RegionalState::Unknown {
+                            let count = self.string[..previdx]
+                                            .chars().rev()
+                                            .map(|c| wd::word_category(c))
+                                            // Ignore because of WB4
+                                            // Combining characters *inside* flag emoji. Yay.
+                                            .filter(|&c| ! (c == wd::WC_ZWJ || c == wd::WC_Extend || c == wd::WC_Format))
+                                            .take_while(|&c| c == wd::WC_Regional_Indicator)
+                                            .count();
+                            regional_state = if count % 2 == 0 {
+                                RegionalState::Full
+                            } else {
+                                RegionalState::Half
+                            };
+                        }
+                        if regional_state == RegionalState::Full {
+                            take_curr = false;
+                            break;
+                        } else {
+                            Regional(RegionalState::Full)
+                        }
+                    }
                     _ => {
                         take_curr = false;
                         break;
