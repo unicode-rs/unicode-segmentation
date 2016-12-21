@@ -211,7 +211,9 @@ impl<'a> Iterator for UWordBounds<'a> {
                     break
                 }
                 Zwj(false) => match cat {                              // rule WB3c
-                    wd::WC_Glue_After_Zwj | wd::WC_E_Base_GAZ => {
+                    wd::WC_Glue_After_Zwj => continue,
+                    wd::WC_E_Base_GAZ => {
+                        state = Emoji;
                         continue;
                     },
                     _ => {
