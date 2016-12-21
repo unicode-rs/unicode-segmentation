@@ -375,6 +375,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
 
             if cat == wd::WC_Extend || cat == wd::WC_Format || cat == wd::WC_ZWJ {
                 if match state {
+                    Zwj(_) if cat == wd::WC_ZWJ => false,
                     FormatExtend(_) | Start => false,
                     _ => true
                 } {
@@ -489,8 +490,6 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                             let count = self.string[..previdx]
                                             .chars().rev()
                                             .map(|c| wd::word_category(c))
-                                            // Ignore because of WB4
-                                            // Combining characters *inside* flag emoji. Yay.
                                             .filter(|&c| ! (c == wd::WC_ZWJ || c == wd::WC_Extend || c == wd::WC_Format))
                                             .take_while(|&c| c == wd::WC_Regional_Indicator)
                                             .count();
@@ -513,7 +512,10 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                     }
                 },
                 Emoji => match cat {                            // rule WB14
-                    wd::WC_E_Base | wd::WC_E_Base_GAZ => continue,
+                    wd::WC_E_Base | wd::WC_E_Base_GAZ => {
+                        state = Zwj(false);
+                        continue
+                    },
                     _ => {
                         take_curr = false;
                         break;
