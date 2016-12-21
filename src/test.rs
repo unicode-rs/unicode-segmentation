@@ -91,7 +91,14 @@ fn test_graphemes() {
 fn test_words() {
     use testdata::TEST_WORD;
 
-    for &(s, w) in TEST_WORD {
+    // Unicode's official tests don't really test longer chains of flag emoji
+    // TODO This could be improved with more tests like flag emoji with interspersed Extend chars and ZWJ
+    const EXTRA_TESTS: &'static [(&'static str, &'static [&'static str])] = &[
+        ("🇦🇫🇦🇽🇦🇱🇩🇿🇦🇸🇦🇩🇦🇴", &["🇦🇫", "🇦🇽", "🇦🇱", "🇩🇿", "🇦🇸", "🇦🇩", "🇦🇴"]),
+        ("🇦🇫🇦🇽🇦🇱🇩🇿🇦🇸🇦🇩🇦", &["🇦🇫", "🇦🇽", "🇦🇱", "🇩🇿", "🇦🇸", "🇦🇩", "🇦"]),
+        ("🇦a🇫🇦🇽a🇦🇱🇩🇿🇦🇸🇦🇩🇦", &["🇦", "a", "🇫🇦", "🇽", "a", "🇦🇱", "🇩🇿", "🇦🇸", "🇦🇩", "🇦"]),
+    ];
+    for &(s, w) in TEST_WORD.iter().chain(EXTRA_TESTS.iter()) {
         macro_rules! assert_ {
             ($test:expr, $exp:expr, $name:expr) => {
                 // collect into vector for better diagnostics in failure case
