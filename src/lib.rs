@@ -46,7 +46,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! unicode-segmentation = "0.1.3"
+//! unicode-segmentation = "1.0.0"
 //! ```
 
 #![deny(missing_docs, unsafe_code)]
