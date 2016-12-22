@@ -257,7 +257,6 @@ def emit_property_module(f, mod, tbl, emit):
 def emit_break_module(f, break_table, break_cats, name):
     Name = name.capitalize()
     f.write("""pub mod %s {
-    use core::slice::SliceExt;
     use core::result::Result::{Ok, Err};
 
     pub use self::%sCat::*;

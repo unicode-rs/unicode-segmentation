@@ -48,17 +48,21 @@ pub struct Graphemes<'a> {
     extended: bool,
     cat: Option<GraphemeCat>,
     catb: Option<GraphemeCat>,
+    regional_count_back: Option<usize>,
 }
 
 // state machine for cluster boundary rules
-#[derive(PartialEq,Eq)]
+#[derive(Copy,Clone,PartialEq,Eq)]
 enum GraphemeState {
     Start,
     FindExtend,
     HangulL,
     HangulLV,
     HangulLVT,
+    Prepend,
     Regional,
+    Emoji,
+    Zwj,
 }
 
 impl<'a> Iterator for Graphemes<'a> {
@@ -82,6 +86,11 @@ impl<'a> Iterator for Graphemes<'a> {
         let mut idx = 0;
         let mut state = Start;
         let mut cat = gr::GC_Any;
+
+        // caching used by next_back() should be invalidated
+        self.regional_count_back = None;
+        self.catb = None;
+
         for (curr, ch) in self.string.char_indices() {
             idx = curr;
 
@@ -93,13 +102,18 @@ impl<'a> Iterator for Graphemes<'a> {
                 _ => self.cat.take().unwrap()
             };
 
-            if match cat {
-                gr::GC_Extend => true,
-                gr::GC_SpacingMark if self.extended => true,
-                _ => false
+            if (state, cat) == (Emoji, gr::GC_Extend) {
+                continue;                   // rule GB10
+            }
+
+            if let Some(new_state) = match cat {
+                gr::GC_Extend => Some(FindExtend),                       // rule GB9
+                gr::GC_SpacingMark if self.extended => Some(FindExtend), // rule GB9a
+                gr::GC_ZWJ => Some(Zwj),                                 // rule GB9/GB11
+                _ => None
             } {
-                    state = FindExtend;     // rule GB9/GB9a
-                    continue;
+                state = new_state;
+                continue;
             }
 
             state = match state {
@@ -116,7 +130,9 @@ impl<'a> Iterator for Graphemes<'a> {
                     gr::GC_L => HangulL,
                     gr::GC_LV | gr::GC_V => HangulLV,
                     gr::GC_LVT | gr::GC_T => HangulLVT,
+                    gr::GC_Prepend if self.extended => Prepend,
                     gr::GC_Regional_Indicator => Regional,
+                    gr::GC_E_Base | gr::GC_E_Base_GAZ => Emoji,
                     _ => FindExtend
                 },
                 FindExtend => {         // found non-extending when looking for extending
@@ -147,13 +163,35 @@ impl<'a> Iterator for Graphemes<'a> {
                         break;
                     }
                 },
-                Regional => match cat {     // rule GB8a
-                    gr::GC_Regional_Indicator => continue,
+                Prepend => match cat {      // rule GB9b
+                    gr::GC_Control => {
+                        take_curr = false;
+                        break;
+                    }
+                    _ => continue
+                },
+                Regional => match cat {     // rule GB12/GB13
+                    gr::GC_Regional_Indicator => FindExtend,
                     _ => {
                         take_curr = false;
                         break;
                     }
-                }
+                },
+                Emoji => match cat {        // rule GB10: (E_Base|EBG) Extend* x E_Modifier
+                    gr::GC_E_Modifier => continue,
+                    _ => {
+                        take_curr = false;
+                        break;
+                    }
+                },
+                Zwj => match cat {          // rule GB11: ZWJ x (GAZ|EBG)
+                    gr::GC_Glue_After_Zwj => continue,
+                    gr::GC_E_Base_GAZ => Emoji,
+                    _ => {
+                        take_curr = false;
+                        break;
+                    }
+                },
             }
         }
 
@@ -184,7 +222,11 @@ impl<'a> DoubleEndedIterator for Graphemes<'a> {
         let mut previdx = idx;
         let mut state = Start;
         let mut cat = gr::GC_Any;
-        for (curr, ch) in self.string.char_indices().rev() {
+
+        // caching used by next() should be invalidated
+        self.cat = None;
+
+        'outer: for (curr, ch) in self.string.char_indices().rev() {
             previdx = idx;
             idx = curr;
 
@@ -215,6 +257,9 @@ impl<'a> DoubleEndedIterator for Graphemes<'a> {
                 Start | FindExtend => match cat {
                     gr::GC_Extend => FindExtend,
                     gr::GC_SpacingMark if self.extended => FindExtend,
+                    gr::GC_ZWJ => FindExtend,
+                    gr::GC_E_Modifier => Emoji,
+                    gr::GC_Glue_After_Zwj | gr::GC_E_Base_GAZ => Zwj,
                     gr::GC_L | gr::GC_LV | gr::GC_LVT => HangulL,
                     gr::GC_V => HangulLV,
                     gr::GC_T => HangulLVT,
@@ -249,8 +294,62 @@ impl<'a> DoubleEndedIterator for Graphemes<'a> {
                         break;
                     }
                 },
-                Regional => match cat {     // rule GB8a
-                    gr::GC_Regional_Indicator => continue,
+                Prepend => {
+                    // not used in reverse iteration
+                    unreachable!()
+                },
+                Regional => {               // rule GB12/GB13
+                    // Need to scan backward to find if this is preceded by an odd or even number
+                    // of Regional_Indicator characters.
+                    let count = match self.regional_count_back {
+                        Some(count) => count,
+                        None => self.string[..previdx].chars().rev().take_while(|c| {
+                                    gr::grapheme_category(*c) == gr::GC_Regional_Indicator
+                                }).count()
+                    };
+                    // Cache the count to avoid re-scanning the same chars on the next iteration.
+                    self.regional_count_back = count.checked_sub(1);
+
+                    if count % 2 == 0 {
+                        take_curr = false;
+                        break;
+                    }
+                    continue;
+                },
+                Emoji => {                  // char to right is E_Modifier
+                    // In order to decide whether to break before this E_Modifier char, we need to
+                    // scan backward past any Extend chars to look for (E_Base|(ZWJ? EBG)).
+                    let mut ebg_idx = None;
+                    for (startidx, prev) in self.string[..previdx].char_indices().rev() {
+                        match (ebg_idx, gr::grapheme_category(prev)) {
+                            (None, gr::GC_Extend) => continue,
+                            (None, gr::GC_E_Base) => {      // rule GB10
+                                // Found an Emoji modifier sequence. Return the whole sequence.
+                                idx = startidx;
+                                break 'outer;
+                            }
+                            (None, gr::GC_E_Base_GAZ) => {  // rule GB10
+                                // Keep scanning in case this is part of an ZWJ x EBJ pair.
+                                ebg_idx = Some(startidx);
+                            }
+                            (Some(_), gr::GC_ZWJ) => {      // rule GB11
+                                idx = startidx;
+                                break 'outer;
+                            }
+                            _ => break
+                        }
+                    }
+                    if let Some(ebg_idx) = ebg_idx {
+                        // Found an EBG without a ZWJ before it.
+                        idx = ebg_idx;
+                        break;
+                    }
+                    // Not part of an Emoji modifier sequence. Break here.
+                    take_curr = false;
+                    break;
+                },
+                Zwj => match cat {          // char to right is (GAZ|EBG)
+                    gr::GC_ZWJ => continue, // rule GB11: ZWJ x (GAZ|EBG)
                     _ => {
                         take_curr = false;
                         break;
@@ -266,6 +365,19 @@ impl<'a> DoubleEndedIterator for Graphemes<'a> {
             Some(cat)
         };
 
+        if self.extended && cat != gr::GC_Control {
+            // rule GB9b: include any preceding Prepend characters
+            for (i, c) in self.string[..idx].char_indices().rev() {
+                match gr::grapheme_category(c) {
+                    gr::GC_Prepend => idx = i,
+                    cat => {
+                        self.catb = Some(cat);
+                        break;
+                    }
+                }
+            }
+        }
+
         let retstr = &self.string[idx..];
         self.string = &self.string[..idx];
         Some(retstr)
@@ -274,7 +386,13 @@ impl<'a> DoubleEndedIterator for Graphemes<'a> {
 
 #[inline]
 pub fn new_graphemes<'b>(s: &'b str, is_extended: bool) -> Graphemes<'b> {
-    Graphemes { string: s, extended: is_extended, cat: None, catb: None }
+    Graphemes {
+        string: s,
+        extended: is_extended,
+        cat: None,
+        catb: None,
+        regional_count_back: None
+    }
 }
 
 #[inline]

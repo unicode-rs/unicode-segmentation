@@ -72,7 +72,7 @@ impl<'a> DoubleEndedIterator for UWordBoundIndices<'a> {
 }
 
 // state machine for word boundary rules
-#[derive(Clone,Copy,PartialEq,Eq)]
+#[derive(Clone,Copy,PartialEq,Eq,Debug)]
 enum UWordBoundsState {
     Start,
     Letter,
@@ -80,12 +80,14 @@ enum UWordBoundsState {
     Numeric,
     Katakana,
     ExtendNumLet,
-    Regional,
+    Regional(RegionalState),
     FormatExtend(FormatExtendType),
+    Zwj,
+    Emoji,
 }
 
 // subtypes for FormatExtend state in UWordBoundsState
-#[derive(Clone,Copy,PartialEq,Eq)]
+#[derive(Clone,Copy,PartialEq,Eq,Debug)]
 enum FormatExtendType {
     AcceptAny,
     AcceptNone,
@@ -93,6 +95,13 @@ enum FormatExtendType {
     RequireHLetter,
     AcceptQLetter,
     RequireNumeric,
+}
+
+#[derive(Clone,Copy,PartialEq,Eq,Debug)]
+enum RegionalState {
+    Half,
+    Full,
+    Unknown,
 }
 
 impl<'a> Iterator for UWordBounds<'a> {
@@ -120,9 +129,13 @@ impl<'a> Iterator for UWordBounds<'a> {
         let mut state = Start;
         let mut cat = wd::WC_Any;
         let mut savecat = wd::WC_Any;
+
+        // Whether or not the previous category was ZWJ
+        // ZWJs get collapsed, so this handles precedence of WB3c over WB4
+        let mut prev_zwj;
         for (curr, ch) in self.string.char_indices() {
             idx = curr;
-
+            prev_zwj = cat == wd::WC_ZWJ;
             // if there's a category cached, grab it
             cat = match self.cat {
                 None => wd::word_category(ch),
@@ -131,17 +144,49 @@ impl<'a> Iterator for UWordBounds<'a> {
             take_cat = true;
 
             // handle rule WB4
-            // just skip all format and extend chars
+            // just skip all format, extend, and zwj chars
             // note that Start is a special case: if there's a bunch of Format | Extend
             // characters at the beginning of a block of text, dump them out as one unit.
             //
             // (This is not obvious from the wording of UAX#29, but if you look at the
             // test cases http://www.unicode.org/Public/UNIDATA/auxiliary/WordBreakTest.txt
             // then the "correct" interpretation of WB4 becomes apparent.)
-            if state != Start && (cat == wd::WC_Extend || cat == wd::WC_Format) {
-                continue;
+            if state != Start {
+                match cat {
+                    wd::WC_Extend | wd::WC_Format | wd::WC_ZWJ => {
+                        continue
+                    }
+                    _ => {}
+                }
             }
 
+            // rule WB3c
+            // WB4 makes all ZWJs collapse into the previous state
+            // but you can still be in a Zwj state if you started with Zwj
+            //
+            // This means that Zwj + Extend will collapse into Zwj, which is wrong,
+            // since Extend has a boundary with following EBG/GAZ chars but ZWJ doesn't,
+            // and that rule (WB3c) has higher priority
+            //
+            // Additionally, Emoji_Base+ZWJ+(EBG/GAZ) will collapse into Emoji_Base+EBG/GAZ
+            // which won't have a boundary even though EB+ZWJ+GAZ should have a boundary.
+            //
+            // Thus, we separately keep track of whether or not the last character
+            // was a ZWJ. This is an additional bit of state tracked outside of the
+            // state enum; the state enum represents the last non-zwj state encountered.
+            // When prev_zwj is true, for the purposes of WB3c, we are in the Zwj state,
+            // however we are in the previous state for the purposes of all other rules.
+            if prev_zwj {
+                match cat { 
+                    wd::WC_Glue_After_Zwj => continue,
+                    wd::WC_E_Base_GAZ => {
+                        state = Emoji;
+                        continue;
+                    },
+                    _ => ()
+                }
+            }
+            // Don't use `continue` in this match without updating `cat`
             state = match state {
                 Start if cat == wd::WC_CR => {
                     idx += match self.get_next_cat(idx) {
@@ -156,19 +201,28 @@ impl<'a> Iterator for UWordBounds<'a> {
                     wd::WC_Numeric => Numeric,          // rule WB8, WB10, WB12, WB13a
                     wd::WC_Katakana => Katakana,        // rule WB13, WB13a
                     wd::WC_ExtendNumLet => ExtendNumLet,    // rule WB13a, WB13b
-                    wd::WC_Regional_Indicator => Regional,  // rule WB13c
+                    wd::WC_Regional_Indicator => Regional(RegionalState::Half),  // rule WB13c
                     wd::WC_LF | wd::WC_Newline => break,    // rule WB3a
+                    wd::WC_ZWJ => Zwj,                      // rule WB3c
+                    wd::WC_E_Base | wd::WC_E_Base_GAZ => Emoji, // rule WB14
                     _ => {
                         if let Some(ncat) = self.get_next_cat(idx) {                // rule WB4
-                            if ncat == wd::WC_Format || ncat == wd::WC_Extend {
+                            if ncat == wd::WC_Format || ncat == wd::WC_Extend || ncat == wd::WC_ZWJ {
                                 state = FormatExtend(AcceptNone);
                                 self.cat = Some(ncat);
                                 continue;
                             }
                         }
-                        break;                                                      // rule WB14
+                        break;                                                      // rule WB999
                     }
                 },
+                Zwj => {
+                    // We already handle WB3c above. At this point,
+                    // the current category is not GAZ or EBG,
+                    // or the previous character was not actually a ZWJ
+                    take_curr = false;
+                    break;
+                }
                 Letter | HLetter => match cat {
                     wd::WC_ALetter => Letter,                   // rule WB5
                     wd::WC_Hebrew_Letter => HLetter,            // rule WB5
@@ -226,8 +280,23 @@ impl<'a> Iterator for UWordBounds<'a> {
                         break;
                     }
                 },
-                Regional => match cat {
-                    wd::WC_Regional_Indicator => Regional,      // rule WB13c
+                Regional(RegionalState::Full) => {
+                    // if it reaches here we've gone too far,
+                    // a full flag can only compose with ZWJ/Extend/Format
+                    // proceeding it.
+                    take_curr = false;
+                    break;
+                }
+                Regional(RegionalState::Half) => match cat {
+                    wd::WC_Regional_Indicator => Regional(RegionalState::Full),      // rule WB13c
+                    _ => {
+                        take_curr = false;
+                        break;
+                    }
+                },
+                Regional(_) => unreachable!("RegionalState::Unknown should not occur on forward iteration"),
+                Emoji => match cat {                            // rule WB14
+                    wd::WC_E_Modifier => state,
                     _ => {
                         take_curr = false;
                         break;
@@ -291,6 +360,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
         let mut state = Start;
         let mut savestate = Start;
         let mut cat = wd::WC_Any;
+
         for (curr, ch) in self.string.char_indices().rev() {
             previdx = idx;
             idx = curr;
@@ -308,7 +378,10 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
             //     Hebrew Letter immediately before it.
             // (2) Format and Extend char handling takes some gymnastics.
 
-            if cat == wd::WC_Extend || cat == wd::WC_Format {
+            if cat == wd::WC_Extend
+                || cat == wd::WC_Format
+                || (cat == wd::WC_ZWJ && state != Zwj) { // WB3c has more priority so we should not
+                                                         // fold in that case
                 if match state {
                     FormatExtend(_) | Start => false,
                     _ => true
@@ -328,6 +401,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                 take_cat = false;
             }
 
+            // Don't use `continue` in this match without updating `catb`
             state = match state {
                 Start | FormatExtend(AcceptAny) => match cat {
                     wd::WC_ALetter => Letter,           // rule WB5, WB7, WB10, WB13b
@@ -335,12 +409,15 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                     wd::WC_Numeric => Numeric,          // rule WB8, WB9, WB11, WB13b
                     wd::WC_Katakana => Katakana,                    // rule WB13, WB13b
                     wd::WC_ExtendNumLet => ExtendNumLet,                    // rule WB13a
-                    wd::WC_Regional_Indicator => Regional,                  // rule WB13c
-                    wd::WC_Extend | wd::WC_Format => FormatExtend(AcceptAny),   // rule WB4
+                    wd::WC_Regional_Indicator => Regional(RegionalState::Unknown), // rule WB13c
+                    wd::WC_Glue_After_Zwj | wd::WC_E_Base_GAZ => Zwj,       // rule WB3c
+                    // rule WB4:
+                    wd::WC_Extend | wd::WC_Format | wd::WC_ZWJ => FormatExtend(AcceptAny),
                     wd::WC_Single_Quote => {
                         saveidx = idx;
                         FormatExtend(AcceptQLetter)                         // rule WB7a
                     },
+                    wd::WC_E_Modifier => Emoji,                             // rule WB14
                     wd::WC_CR | wd::WC_LF | wd::WC_Newline => {
                         if state == Start {
                             if cat == wd::WC_LF {
@@ -354,7 +431,16 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                         }
                         break;                                              // rule WB3a
                     },
-                    _ => break                              // rule WB14
+                    _ => break                              // rule WB999
+                },
+                Zwj => match cat {                          // rule WB3c
+                    wd::WC_ZWJ => {
+                        FormatExtend(AcceptAny)
+                    }
+                    _ => {
+                        take_curr = false;
+                        break;
+                    }
                 },
                 Letter | HLetter => match cat {
                     wd::WC_ALetter => Letter,               // rule WB5
@@ -407,8 +493,38 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                         break;
                     }
                 },
-                Regional => match cat {
-                    wd::WC_Regional_Indicator => Regional,  // rule WB13c
+                Regional(mut regional_state) => match cat {
+                    // rule WB13c
+                    wd::WC_Regional_Indicator => {
+                        if regional_state == RegionalState::Unknown {
+                            let count = self.string[..previdx]
+                                            .chars().rev()
+                                            .map(|c| wd::word_category(c))
+                                            .filter(|&c| ! (c == wd::WC_ZWJ || c == wd::WC_Extend || c == wd::WC_Format))
+                                            .take_while(|&c| c == wd::WC_Regional_Indicator)
+                                            .count();
+                            regional_state = if count % 2 == 0 {
+                                RegionalState::Full
+                            } else {
+                                RegionalState::Half
+                            };
+                        }
+                        if regional_state == RegionalState::Full {
+                            take_curr = false;
+                            break;
+                        } else {
+                            Regional(RegionalState::Full)
+                        }
+                    }
+                    _ => {
+                        take_curr = false;
+                        break;
+                    }
+                },
+                Emoji => match cat {                            // rule WB14
+                    wd::WC_E_Base | wd::WC_E_Base_GAZ => {
+                        Zwj
+                    },
                     _ => {
                         take_curr = false;
                         break;

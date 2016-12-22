@@ -16,6 +16,15 @@ use std::prelude::v1::*;
 fn test_graphemes() {
     use testdata::{TEST_SAME, TEST_DIFF};
 
+    pub const EXTRA_DIFF: &'static [(&'static str,
+                                     &'static [&'static str],
+                                     &'static [&'static str])] = &[
+        // Official test suite doesn't include two Prepend chars between two other chars.
+        ("\u{20}\u{600}\u{600}\u{20}",
+         &["\u{20}", "\u{600}\u{600}\u{20}"],
+         &["\u{20}", "\u{600}", "\u{600}", "\u{20}"]),
+    ];
+
     for &(s, g) in TEST_SAME {
         // test forward iterator
         assert!(UnicodeSegmentation::graphemes(s, true)
@@ -34,11 +43,11 @@ fn test_graphemes() {
                 .all(|(a,b)| a == b));
     }
 
-    for &(s, gt, gf) in TEST_DIFF {
+    for &(s, gt, gf) in TEST_DIFF.iter().chain(EXTRA_DIFF) {
         // test forward iterator
         assert!(UnicodeSegmentation::graphemes(s, true)
                 .zip(gt.iter().cloned())
-                .all(|(a,b)| a == b));
+                .all(|(a,b)| a == b), "{:?}", s);
         assert!(UnicodeSegmentation::graphemes(s, false)
                 .zip(gf.iter().cloned())
                 .all(|(a,b)| a == b));
@@ -82,16 +91,36 @@ fn test_graphemes() {
 fn test_words() {
     use testdata::TEST_WORD;
 
-    for &(s, w) in TEST_WORD {
+    // Unicode's official tests don't really test longer chains of flag emoji
+    // TODO This could be improved with more tests like flag emoji with interspersed Extend chars and ZWJ
+    const EXTRA_TESTS: &'static [(&'static str, &'static [&'static str])] = &[
+        ("🇦🇫🇦🇽🇦🇱🇩🇿🇦🇸🇦🇩🇦🇴", &["🇦🇫", "🇦🇽", "🇦🇱", "🇩🇿", "🇦🇸", "🇦🇩", "🇦🇴"]),
+        ("🇦🇫🇦🇽🇦🇱🇩🇿🇦🇸🇦🇩🇦", &["🇦🇫", "🇦🇽", "🇦🇱", "🇩🇿", "🇦🇸", "🇦🇩", "🇦"]),
+        ("🇦a🇫🇦🇽a🇦🇱🇩🇿🇦🇸🇦🇩🇦", &["🇦", "a", "🇫🇦", "🇽", "a", "🇦🇱", "🇩🇿", "🇦🇸", "🇦🇩", "🇦"]),
+        ("\u{1f468}\u{200d}\u{1f468}\u{200d}\u{1f466}",  &["\u{1f468}\u{200d}\u{1f468}\u{200d}\u{1f466}"]),
+        ("😌👎🏼",  &["😌", "👎🏼"]),
+        // perhaps wrong, spaces should not be included?
+        ("hello world", &["hello", " ", "world"]),
+        ("🇨🇦🇨🇭🇿🇲🇿 hi", &["🇨🇦", "🇨🇭", "🇿🇲", "🇿", " ", "hi"]),
+    ];
+    for &(s, w) in TEST_WORD.iter().chain(EXTRA_TESTS.iter()) {
+        macro_rules! assert_ {
+            ($test:expr, $exp:expr, $name:expr) => {
+                // collect into vector for better diagnostics in failure case
+                let testing = $test.collect::<Vec<_>>();
+                let expected = $exp.collect::<Vec<_>>();
+                assert_eq!(testing, expected, "{} test for testcase ({:?}, {:?}) failed.", $name, s, w)
+            }
+        }
         // test forward iterator
-        assert!(s.split_word_bounds()
-                .zip(w.iter().cloned())
-                .all(|(a,b)| a == b));
+        assert_!(s.split_word_bounds(),
+                w.iter().cloned(),
+                "Forward word boundaries");
 
         // test reverse iterator
-        assert!(s.split_word_bounds().rev()
-                .zip(w.iter().rev().cloned())
-                .all(|(a,b)| a == b));
+        assert_!(s.split_word_bounds().rev(),
+                w.iter().rev().cloned(),
+                "Reverse word boundaries");
 
         // generate offsets from word string lengths
         let mut indices = vec![0];
@@ -102,13 +131,13 @@ fn test_words() {
         let indices = indices;
 
         // test forward indices iterator
-        assert!(s.split_word_bound_indices()
-                 .zip(indices.iter())
-                 .all(|((l,_),m)| l == *m));
+        assert_!(s.split_word_bound_indices().map(|(l,_)| l),
+                 indices.iter().cloned(),
+                 "Forward word indices");
 
         // test backward indices iterator
-        assert!(s.split_word_bound_indices().rev()
-                 .zip(indices.iter().rev())
-                 .all(|((l,_),m)| l == *m));
+        assert_!(s.split_word_bound_indices().rev().map(|(l,_)| l),
+                 indices.iter().rev().cloned(),
+                 "Reverse word indices");
     }
 }
