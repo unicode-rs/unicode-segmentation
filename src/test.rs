@@ -24,8 +24,8 @@ fn test_graphemes() {
          &["\u{20}", "\u{600}\u{600}\u{20}"],
          &["\u{20}", "\u{600}", "\u{600}", "\u{20}"]),
 
-	// Test for Prepend followed by two Any chars
-	("\u{600}\u{20}\u{20}",
+        // Test for Prepend followed by two Any chars
+        ("\u{600}\u{20}\u{20}",
          &["\u{600}\u{20}", "\u{20}"],
          &["\u{600}", "\u{20}", "\u{20}"]),
     ];
