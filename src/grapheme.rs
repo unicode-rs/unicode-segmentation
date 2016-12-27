@@ -125,8 +125,11 @@ impl<'a> Iterator for Graphemes<'a> {
                     }
                     break;                      // rule GB4
                 }
-                Start => match cat {
-                    gr::GC_Control => break,
+                Start | Prepend => match cat {
+                    gr::GC_Control => {         // rule GB5
+                        take_curr = state == Start;
+                        break;
+                    }
                     gr::GC_L => HangulL,
                     gr::GC_LV | gr::GC_V => HangulLV,
                     gr::GC_LVT | gr::GC_T => HangulLVT,
@@ -162,13 +165,6 @@ impl<'a> Iterator for Graphemes<'a> {
                         take_curr = false;
                         break;
                     }
-                },
-                Prepend => match cat {      // rule GB9b
-                    gr::GC_Control => {
-                        take_curr = false;
-                        break;
-                    }
-                    _ => continue
                 },
                 Regional => match cat {     // rule GB12/GB13
                     gr::GC_Regional_Indicator => FindExtend,
