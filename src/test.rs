@@ -146,3 +146,37 @@ fn test_words() {
                  "Reverse word indices");
     }
 }
+
+quickcheck! {
+    fn quickcheck_forward_reverse_graphemes_extended(s: String) -> bool {
+        let a = s.graphemes(true).collect::<Vec<_>>();
+        let mut b = s.graphemes(true).rev().collect::<Vec<_>>();
+        b.reverse();
+        a == b
+    }
+
+    fn quickcheck_forward_reverse_graphemes_legacy(s: String) -> bool {
+        let a = s.graphemes(false).collect::<Vec<_>>();
+        let mut b = s.graphemes(false).rev().collect::<Vec<_>>();
+        b.reverse();
+        a == b
+    }
+
+    fn quickcheck_join_graphemes(s: String) -> bool {
+        let a = s.graphemes(true).collect::<String>();
+        let b = s.graphemes(false).collect::<String>();
+        a == s && b == s
+    }
+
+    fn quickcheck_forward_reverse_words(s: String) -> bool {
+        let a = s.split_word_bounds().collect::<Vec<_>>();
+        let mut b = s.split_word_bounds().rev().collect::<Vec<_>>();
+        b.reverse();
+        a == b
+    }
+
+    fn quickcheck_join_words(s: String) -> bool {
+        let a = s.split_word_bounds().collect::<String>();
+        a == s
+    }
+}
