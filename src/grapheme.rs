@@ -19,6 +19,25 @@ pub struct GraphemeIndices<'a> {
     iter: Graphemes<'a>,
 }
 
+impl<'a> GraphemeIndices<'a> {
+    #[inline]
+    /// View the underlying data (the part yet to be iterated) as a slice of the original string.
+    ///
+    /// ```rust
+    /// # use unicode_segmentation::UnicodeSegmentation;
+    /// let mut iter = "abc".grapheme_indices(true);
+    /// assert_eq!(iter.as_str(), "abc");
+    /// iter.next();
+    /// assert_eq!(iter.as_str(), "bc");
+    /// iter.next();
+    /// iter.next();
+    /// assert_eq!(iter.as_str(), "");
+    /// ```
+    pub fn as_str(&self) -> &'a str {
+        self.iter.as_str()
+    }
+}
+
 impl<'a> Iterator for GraphemeIndices<'a> {
     type Item = (usize, &'a str);
 
@@ -49,6 +68,25 @@ pub struct Graphemes<'a> {
     cat: Option<GraphemeCat>,
     catb: Option<GraphemeCat>,
     regional_count_back: Option<usize>,
+}
+
+impl<'a> Graphemes<'a> {
+    #[inline]
+    /// View the underlying data (the part yet to be iterated) as a slice of the original string.
+    ///
+    /// ```rust
+    /// # use unicode_segmentation::UnicodeSegmentation;
+    /// let mut iter = "abc".graphemes(true);
+    /// assert_eq!(iter.as_str(), "abc");
+    /// iter.next();
+    /// assert_eq!(iter.as_str(), "bc");
+    /// iter.next();
+    /// iter.next();
+    /// assert_eq!(iter.as_str(), "");
+    /// ```
+    pub fn as_str(&self) -> &'a str {
+        self.string
+    }
 }
 
 // state machine for cluster boundary rules
