@@ -50,6 +50,24 @@ pub struct UWordBoundIndices<'a> {
     iter: UWordBounds<'a>,
 }
 
+impl<'a> UWordBoundIndices<'a> {
+    #[inline]
+    /// View the underlying data (the part yet to be iterated) as a slice of the original string.
+    ///
+    /// ```rust
+    /// # use unicode_segmentation::UnicodeSegmentation;
+    /// let mut iter = "Hello world".split_word_bound_indices();
+    /// assert_eq!(iter.as_str(), "Hello world");
+    /// iter.next();
+    /// assert_eq!(iter.as_str(), " world");
+    /// iter.next();
+    /// assert_eq!(iter.as_str(), "world");
+    /// ```
+    pub fn as_str(&self) -> &'a str {
+        self.iter.as_str()
+    }
+}
+
 impl<'a> Iterator for UWordBoundIndices<'a> {
     type Item = (usize, &'a str);
 
@@ -569,6 +587,22 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
 }
 
 impl<'a> UWordBounds<'a> {
+    #[inline]
+    /// View the underlying data (the part yet to be iterated) as a slice of the original string.
+    ///
+    /// ```rust
+    /// # use unicode_segmentation::UnicodeSegmentation;
+    /// let mut iter = "Hello world".split_word_bounds();
+    /// assert_eq!(iter.as_str(), "Hello world");
+    /// iter.next();
+    /// assert_eq!(iter.as_str(), " world");
+    /// iter.next();
+    /// assert_eq!(iter.as_str(), "world");
+    /// ```
+    pub fn as_str(&self) -> &'a str {
+        self.string
+    }
+
     #[inline]
     fn get_next_cat(&self, idx: usize) -> Option<WordCat> {
         use tables::word as wd;
