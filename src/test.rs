@@ -30,40 +30,24 @@ fn test_graphemes() {
          &["\u{600}", "\u{20}", "\u{20}"]),
     ];
 
-    for &(s, g) in TEST_SAME {
+    for &(s, g) in TEST_SAME.iter() {
         // test forward iterator
-        assert!(UnicodeSegmentation::graphemes(s, true)
-                .zip(g.iter().cloned())
-                .all(|(a,b)| a == b));
-        assert!(UnicodeSegmentation::graphemes(s, false)
-                .zip(g.iter().cloned())
-                .all(|(a,b)| a == b));
+        assert!(UnicodeSegmentation::graphemes(s, true).eq(g.iter().cloned()));
+        assert!(UnicodeSegmentation::graphemes(s, false).eq(g.iter().cloned()));
 
         // test reverse iterator
-        assert!(UnicodeSegmentation::graphemes(s, true).rev()
-                .zip(g.iter().rev().cloned())
-                .all(|(a,b)| a == b));
-        assert!(UnicodeSegmentation::graphemes(s, false).rev()
-                .zip(g.iter().rev().cloned())
-                .all(|(a,b)| a == b));
+        assert!(UnicodeSegmentation::graphemes(s, true).rev().eq(g.iter().rev().cloned()));
+        assert!(UnicodeSegmentation::graphemes(s, false).rev().eq(g.iter().rev().cloned()));
     }
 
     for &(s, gt, gf) in TEST_DIFF.iter().chain(EXTRA_DIFF) {
         // test forward iterator
-        assert!(UnicodeSegmentation::graphemes(s, true)
-                .zip(gt.iter().cloned())
-                .all(|(a,b)| a == b), "{:?}", s);
-        assert!(UnicodeSegmentation::graphemes(s, false)
-                .zip(gf.iter().cloned())
-                .all(|(a,b)| a == b));
+        assert!(UnicodeSegmentation::graphemes(s, true).eq(gt.iter().cloned()));
+        assert!(UnicodeSegmentation::graphemes(s, false).eq(gf.iter().cloned()));
 
         // test reverse iterator
-        assert!(UnicodeSegmentation::graphemes(s, true).rev()
-                .zip(gt.iter().rev().cloned())
-                .all(|(a,b)| a == b));
-        assert!(UnicodeSegmentation::graphemes(s, false).rev()
-                .zip(gf.iter().rev().cloned())
-                .all(|(a,b)| a == b));
+        assert!(UnicodeSegmentation::graphemes(s, true).rev().eq(gt.iter().rev().cloned()));
+        assert!(UnicodeSegmentation::graphemes(s, false).rev().eq(gf.iter().rev().cloned()));
     }
 
     // test the indices iterators
