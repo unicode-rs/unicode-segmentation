@@ -382,8 +382,8 @@ impl<'a> DoubleEndedIterator for Graphemes<'a> {
                     take_curr = false;
                     break;
                 },
-                Zwj => match cat {          // char to right is (GAZ|EBG)
-                    gr::GC_ZWJ => continue, // rule GB11: ZWJ x (GAZ|EBG)
+                Zwj => match cat {            // char to right is (GAZ|EBG)
+                    gr::GC_ZWJ => FindExtend, // rule GB11: ZWJ x (GAZ|EBG)
                     _ => {
                         take_curr = false;
                         break;
