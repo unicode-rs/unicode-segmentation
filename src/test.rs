@@ -30,7 +30,13 @@ fn test_graphemes() {
          &["\u{600}", "\u{20}", "\u{20}"]),
     ];
 
-    for &(s, g) in TEST_SAME.iter() {
+    pub const EXTRA_SAME: &'static [(&'static str, &'static [&'static str])] = &[
+        // family emoji (more than two emoji joined by ZWJ)
+        ("\u{1f468}\u{200d}\u{1f467}\u{200d}\u{1f466}",
+         &["\u{1f468}\u{200d}\u{1f467}\u{200d}\u{1f466}"]),
+    ];
+
+    for &(s, g) in TEST_SAME.iter().chain(EXTRA_SAME) {
         // test forward iterator
         assert!(UnicodeSegmentation::graphemes(s, true).eq(g.iter().cloned()));
         assert!(UnicodeSegmentation::graphemes(s, false).eq(g.iter().cloned()));
