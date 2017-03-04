@@ -478,8 +478,8 @@ enum PairResult {
 }
 
 fn check_pair(before: GraphemeCat, after: GraphemeCat) -> PairResult {
-    use self::PairResult::*;
     use tables::grapheme::GraphemeCat::*;
+    use self::PairResult::*;
     match (before, after) {
         (GC_Control, GC_Control) => CheckCrlf,  // GB3
         (GC_Control, _) => Break,  // GB4
@@ -498,7 +498,7 @@ fn check_pair(before: GraphemeCat, after: GraphemeCat) -> PairResult {
         (_, GC_ZWJ) => NotBreak,  // GB9
         (_, GC_SpacingMark) => Extended,  // GB9a
         (GC_Prepend, _) => Extended,  // GB9a
-        (GC_Base, GC_E_Modifier) => NotBreak,  // GB10
+        (GC_E_Base, GC_E_Modifier) => NotBreak,  // GB10
         (GC_E_Base_GAZ, GC_E_Modifier) => NotBreak,  // GB10
         (GC_Extend, GC_E_Modifier) => Emoji,  // GB10
         (GC_ZWJ, GC_Glue_After_Zwj) => NotBreak,  // GB11
@@ -527,6 +527,17 @@ impl GraphemeCursor {
         }
     }
 
+    pub fn set_cursor(&mut self, offset: usize) {
+        if offset != self.offset {
+            self.offset = offset;
+            self.state = if offset == 0 || offset == self.len {
+                GraphemeCursorState::Break
+            } else {
+                GraphemeCursorState::Unknown
+            };
+        }
+    }
+
     pub fn provide_context(&mut self, chunk: &str, chunk_start: usize) {
         use tables::grapheme as gr;
         assert!(chunk_start + chunk.len() == self.pre_context_offset.unwrap());
@@ -534,7 +545,7 @@ impl GraphemeCursor {
         if self.is_extended && chunk_start + chunk.len() == self.offset {
             let ch = chunk.chars().rev().next().unwrap();
             if gr::grapheme_category(ch) == gr::GC_Prepend {
-                self.decide(false);
+                self.decide(false);  // GB9b
                 return;
             }
         }
@@ -680,4 +691,54 @@ impl GraphemeCursor {
         }
     }
 
+    pub fn next_boundary(&mut self, chunk: &str, chunk_start: usize) -> Result<Option<usize>, GraphemeIncomplete> {
+        if self.offset == self.len {
+            return Ok(None);
+        }
+        loop {
+            let ch = chunk[self.offset - chunk_start..].chars().next().unwrap();
+            self.offset += ch.len_utf8();
+            self.cat = self.catb.take();
+            self.state = GraphemeCursorState::Unknown;
+            if let (Some(ris_count), Some(cat)) = (self.ris_count, self.cat) {
+                if cat == GraphemeCat::GC_Regional_Indicator {
+                    self.ris_count = Some(ris_count + 1);
+                } else {
+                    self.ris_count = Some(0);
+                }
+            }
+            if self.offset == self.len {
+                self.decide(true);
+            } else if self.offset >= chunk_start + chunk.len() {
+                return Err(GraphemeIncomplete::NextChunk);
+            }
+            if self.is_boundary(chunk, chunk_start)? {
+                return Ok(Some(self.offset));
+            }
+        }
+    }
+
+    pub fn prev_boundary(&mut self, chunk: &str, chunk_start: usize) -> Result<Option<usize>, GraphemeIncomplete> {
+        if self.offset == 0 {
+            return Ok(None);
+        }
+        loop {
+            if self.offset == chunk_start {
+                return Err(GraphemeIncomplete::PrevChunk);
+            }
+            let ch = chunk[..self.offset - chunk_start].chars().rev().next().unwrap();
+            self.offset -= ch.len_utf8();
+            self.catb = self.cat.take();
+            self.state = GraphemeCursorState::Unknown;
+            if let Some(ris_count) = self.ris_count {
+                self.ris_count = if ris_count > 0 { Some(ris_count - 1) } else { None };
+            }
+            if self.offset == 0 {
+                self.decide(true);
+            }
+            if self.is_boundary(chunk, chunk_start)? {
+                return Ok(Some(self.offset));
+            }
+        }
+    }
 }
