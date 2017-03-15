@@ -144,8 +144,6 @@ enum GraphemeState {
     NotBreak,
     // It is known to be a boundary.
     Break,
-    // The codepoint after is LF, so a boundary iff the codepoint before is not CR. (GB3)
-    CheckCrlf,
     // The codepoint after is a Regional Indicator Symbol, so a boundary iff
     // it is preceded by an even number of RIS codepoints. (GB12, GB13)
     Regional,
@@ -212,7 +210,6 @@ enum PairResult {
     NotBreak,  // definitely not a break
     Break,  // definitely a break
     Extended,  // a break iff not in extended mode
-    CheckCrlf,  // a break unless it's a CR LF pair
     Regional,  // a break if preceded by an even number of RIS
     Emoji,  // a break if preceded by emoji base and (Extend)*
 }
@@ -221,9 +218,13 @@ fn check_pair(before: GraphemeCat, after: GraphemeCat) -> PairResult {
     use tables::grapheme::GraphemeCat::*;
     use self::PairResult::*;
     match (before, after) {
-        (GC_Control, GC_Control) => CheckCrlf,  // GB3
+        (GC_CR, GC_LF) => NotBreak,  // GB3
         (GC_Control, _) => Break,  // GB4
+        (GC_CR, _) => Break,  // GB4
+        (GC_LF, _) => Break,  // GB4
         (_, GC_Control) => Break,  // GB5
+        (_, GC_CR) => Break,  // GB5
+        (_, GC_LF) => Break,  // GB5
         (GC_L, GC_L) => NotBreak,  // GB6
         (GC_L, GC_V) => NotBreak,  // GB6
         (GC_L, GC_LV) => NotBreak,  // GB6
@@ -357,10 +358,6 @@ impl GraphemeCursor {
             }
         }
         match self.state {
-            GraphemeState::CheckCrlf => {
-                let is_break = chunk.as_bytes()[chunk.len() - 1] != b'\r';
-                self.decide(is_break);
-            }
             GraphemeState::Regional => self.handle_regional(chunk, chunk_start),
             GraphemeState::Emoji => self.handle_emoji(chunk, chunk_start),
             _ => panic!("invalid state")
@@ -480,11 +477,6 @@ impl GraphemeCursor {
         if self.offset == chunk_start {
             let mut need_pre_context = true;
             match self.cat_after.unwrap() {
-                gr::GC_Control => {
-                    if chunk.as_bytes()[offset_in_chunk] == b'\n' {
-                        self.state = GraphemeState::CheckCrlf;
-                    }
-                }
                 gr::GC_Regional_Indicator => self.state = GraphemeState::Regional,
                 gr::GC_E_Modifier => self.state = GraphemeState::Emoji,
                 _ => need_pre_context = self.cat_before.is_none(),
@@ -504,17 +496,6 @@ impl GraphemeCursor {
             PairResult::Extended => {
                 let is_extended = self.is_extended;
                 return self.decision(!is_extended);
-            }
-            PairResult::CheckCrlf => {
-                if chunk.as_bytes()[offset_in_chunk] != b'\n' {
-                    return self.decision(true);
-                }
-                // TODO: I think we don't have to test this
-                if self.offset > chunk_start {
-                    return self.decision(chunk.as_bytes()[offset_in_chunk - 1] != b'\r');
-                }
-                self.state = GraphemeState::CheckCrlf;
-                return Err(GraphemeIncomplete::PreContext(chunk_start));
             }
             PairResult::Regional => {
                 if let Some(ris_count) = self.ris_count {
