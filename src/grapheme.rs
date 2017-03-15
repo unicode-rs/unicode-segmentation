@@ -135,28 +135,51 @@ pub fn new_grapheme_indices<'b>(s: &'b str, is_extended: bool) -> GraphemeIndice
 }
 
 // maybe unify with PairResult?
+// An enum describing information about a potential boundary.
 #[derive(PartialEq, Eq, Clone)]
 enum GraphemeState {
+    // No information is known.
     Unknown,
+    // It is known to not be a boundary.
     NotBreak,
+    // It is known to be a boundary.
     Break,
+    // The codepoint after is LF, so a boundary iff the codepoint before is not CR. (GB3)
     CheckCrlf,
+    // The codepoint after is a Regional Indicator Symbol, so a boundary iff
+    // it is preceded by an even number of RIS codepoints. (GB12, GB13)
     Regional,
+    // The codepoint after is in the E_Modifier category, so whether it's a boundary
+    // depends on pre-context according to GB10.
     Emoji,
 }
 
 /// Cursor-based segmenter for grapheme clusters.
 #[derive(Clone)]
 pub struct GraphemeCursor {
-    offset: usize,  // current cursor position
-    len: usize,  // total length of the string
+    // Current cursor position.
+    offset: usize,
+    // Total length of the string.
+    len: usize,
+    // A config flag indicating whether this cursor computes legacy or extended
+    // grapheme cluster boundaries (enables GB9a and GB9b if set).
     is_extended: bool,
+    // Information about the potential boundary at `offset`
     state: GraphemeState,
-    cat_before: Option<GraphemeCat>,  // category of codepoint immediately preceding cursor
-    cat_after: Option<GraphemeCat>,  // category of codepoint immediately after cursor
+    // Category of codepoint immediately preceding cursor, if known.
+    cat_before: Option<GraphemeCat>,
+    // Category of codepoint immediately after cursor, if known.
+    cat_after: Option<GraphemeCat>,
+    // If set, at least one more codepoint immediately preceding this offset
+    // is needed to resolve whether there's a boundary at `offset`.
     pre_context_offset: Option<usize>,
+    // The number of RIS codepoints preceding `offset`. If `pre_context_offset`
+    // is set, then counts the number of RIS between that and `offset`, otherwise
+    // is an accurate count relative to the string.
     ris_count: Option<usize>,
-    resuming: bool,  // query was suspended
+    // Set if a call to `prev_boundary` or `next_boundary` was suspended due
+    // to needing more input.
+    resuming: bool,
 }
 
 /// An error return indicating that not enough content was available in the
@@ -183,14 +206,15 @@ pub enum GraphemeIncomplete {
     InvalidOffset,
 }
 
+// An enum describing the result from lookup of a pair of categories.
 #[derive(PartialEq, Eq)]
 enum PairResult {
     NotBreak,  // definitely not a break
     Break,  // definitely a break
-    Extended,  // a break if not in extended mode
+    Extended,  // a break iff not in extended mode
     CheckCrlf,  // a break unless it's a CR LF pair
     Regional,  // a break if preceded by an even number of RIS
-    Emoji,  // a break if preceded by emoji base and extend
+    Emoji,  // a break if preceded by emoji base and (Extend)*
 }
 
 fn check_pair(before: GraphemeCat, after: GraphemeCat) -> PairResult {
@@ -213,7 +237,7 @@ fn check_pair(before: GraphemeCat, after: GraphemeCat) -> PairResult {
         (_, GC_Extend) => NotBreak, // GB9
         (_, GC_ZWJ) => NotBreak,  // GB9
         (_, GC_SpacingMark) => Extended,  // GB9a
-        (GC_Prepend, _) => Extended,  // GB9a
+        (GC_Prepend, _) => Extended,  // GB9b
         (GC_E_Base, GC_E_Modifier) => NotBreak,  // GB10
         (GC_E_Base_GAZ, GC_E_Modifier) => NotBreak,  // GB10
         (GC_Extend, GC_E_Modifier) => Emoji,  // GB10
@@ -230,6 +254,15 @@ impl GraphemeCursor {
     /// controls whether extended grapheme clusters are selected.
     ///
     /// The `offset` parameter must be on a codepoint boundary.
+    ///
+    /// ```rust
+    /// # use unicode_segmentation::GraphemeCursor;
+    /// let s = "हिन्दी";
+    /// let mut legacy = GraphemeCursor::new(0, s.len(), false);
+    /// assert_eq!(legacy.next_boundary(s, 0), Ok(Some("ह".len())));
+    /// let mut extended = GraphemeCursor::new(0, s.len(), true);
+    /// assert_eq!(extended.next_boundary(s, 0), Ok(Some("हि".len())));
+    /// ```
     pub fn new(offset: usize, len: usize, is_extended: bool) -> GraphemeCursor {
         let state = if offset == 0 || offset == len {
             GraphemeState::Break
@@ -252,6 +285,15 @@ impl GraphemeCursor {
     // Not sure I'm gonna keep this, the advantage over new() seems thin.
 
     /// Set the cursor to a new location in the same string.
+    ///
+    /// ```rust
+    /// # use unicode_segmentation::GraphemeCursor;
+    /// let s = "abcd";
+    /// let mut cursor = GraphemeCursor::new(0, s.len(), false);
+    /// assert_eq!(cursor.cur_cursor(), 0);
+    /// cursor.set_cursor(2);
+    /// assert_eq!(cursor.cur_cursor(), 2);
+    /// ```
     pub fn set_cursor(&mut self, offset: usize) {
         if offset != self.offset {
             self.offset = offset;
@@ -270,6 +312,16 @@ impl GraphemeCursor {
     /// The current offset of the cursor. Equal to the last value provided to
     /// `new()` or `set_cursor()`, or returned from `next_boundary()` or
     /// `prev_boundary()`.
+    ///
+    /// ```rust
+    /// # use unicode_segmentation::GraphemeCursor;
+    /// // Two flags (🇷🇸🇮🇴), each flag is two RIS codepoints, each RIS is 4 bytes.
+    /// let flags = "\u{1F1F7}\u{1F1F8}\u{1F1EE}\u{1F1F4}";
+    /// let mut cursor = GraphemeCursor::new(4, flags.len(), false);
+    /// assert_eq!(cursor.cur_cursor(), 4);
+    /// assert_eq!(cursor.next_boundary(flags, 0), Ok(Some(8)));
+    /// assert_eq!(cursor.cur_cursor(), 8);
+    /// ```
     pub fn cur_cursor(&self) -> usize {
         self.offset
     }
@@ -277,6 +329,22 @@ impl GraphemeCursor {
     /// Provide additional pre-context when it is needed to decide a boundary.
     /// The end of the chunk must coincide with the value given in the
     /// `GraphemeIncomplete::PreContext` request.
+    ///
+    /// ```rust
+    /// # use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
+    /// let flags = "\u{1F1F7}\u{1F1F8}\u{1F1EE}\u{1F1F4}";
+    /// let mut cursor = GraphemeCursor::new(8, flags.len(), false);
+    /// // Note enough pre-context to decide if there's a boundary between the two flags.
+    /// assert_eq!(cursor.is_boundary(&flags[8..], 8), Err(GraphemeIncomplete::PreContext(8)));
+    /// // Provide one more Regional Indicator Symbol of pre-context
+    /// cursor.provide_context(&flags[4..8], 4);
+    /// // Still not enough context to decide.
+    /// assert_eq!(cursor.is_boundary(&flags[8..], 8), Err(GraphemeIncomplete::PreContext(4)));
+    /// // Provide additional requested context.
+    /// cursor.provide_context(&flags[0..4], 0);
+    /// // That's enough to decide (it always is when context goes to the start of the string)
+    /// assert_eq!(cursor.is_boundary(&flags[8..], 8), Ok(true));
+    /// ```
     pub fn provide_context(&mut self, chunk: &str, chunk_start: usize) {
         use tables::grapheme as gr;
         assert!(chunk_start + chunk.len() == self.pre_context_offset.unwrap());
@@ -379,6 +447,15 @@ impl GraphemeCursor {
     /// All calls should have consistent chunk contents (ie, if a chunk provides
     /// content for a given slice, all further chunks covering that slice must have
     /// the same content for it).
+    ///
+    /// ```rust
+    /// # use unicode_segmentation::GraphemeCursor;
+    /// let flags = "\u{1F1F7}\u{1F1F8}\u{1F1EE}\u{1F1F4}";
+    /// let mut cursor = GraphemeCursor::new(8, flags.len(), false);
+    /// assert_eq!(cursor.is_boundary(flags, 0), Ok(true));
+    /// cursor.set_cursor(12);
+    /// assert_eq!(cursor.is_boundary(flags, 0), Ok(false));
+    /// ```
     pub fn is_boundary(&mut self, chunk: &str, chunk_start: usize) -> Result<bool, GraphemeIncomplete> {
         use tables::grapheme as gr;
         if self.state == GraphemeState::Break {
@@ -388,7 +465,9 @@ impl GraphemeCursor {
             return Ok(false)
         }
         if self.offset < chunk_start || self.offset >= chunk_start + chunk.len() {
-            return Err(GraphemeIncomplete::InvalidOffset)
+            if self.offset > chunk_start + chunk.len() || self.cat_after.is_none() {
+                return Err(GraphemeIncomplete::InvalidOffset)
+            }
         }
         if let Some(pre_context_offset) = self.pre_context_offset {
             return Err(GraphemeIncomplete::PreContext(pre_context_offset));
@@ -399,6 +478,7 @@ impl GraphemeCursor {
             self.cat_after = Some(gr::grapheme_category(ch));
         }
         if self.offset == chunk_start {
+            let mut need_pre_context = true;
             match self.cat_after.unwrap() {
                 gr::GC_Control => {
                     if chunk.as_bytes()[offset_in_chunk] == b'\n' {
@@ -407,10 +487,12 @@ impl GraphemeCursor {
                 }
                 gr::GC_Regional_Indicator => self.state = GraphemeState::Regional,
                 gr::GC_E_Modifier => self.state = GraphemeState::Emoji,
-                _ => ()
+                _ => need_pre_context = self.cat_before.is_none(),
             }
-            self.pre_context_offset = Some(chunk_start);
-            return Err(GraphemeIncomplete::PreContext(chunk_start));
+            if need_pre_context {
+                self.pre_context_offset = Some(chunk_start);
+                return Err(GraphemeIncomplete::PreContext(chunk_start));
+            }
         }
         if self.cat_before.is_none() {
             let ch = chunk[..offset_in_chunk].chars().rev().next().unwrap();
@@ -457,6 +539,29 @@ impl GraphemeCursor {
     /// given, then retry.
     ///
     /// See `is_boundary` for expectations on the provided chunk.
+    ///
+    /// ```rust
+    /// # use unicode_segmentation::GraphemeCursor;
+    /// let flags = "\u{1F1F7}\u{1F1F8}\u{1F1EE}\u{1F1F4}";
+    /// let mut cursor = GraphemeCursor::new(4, flags.len(), false);
+    /// assert_eq!(cursor.next_boundary(flags, 0), Ok(Some(8)));
+    /// assert_eq!(cursor.next_boundary(flags, 0), Ok(Some(16)));
+    /// assert_eq!(cursor.next_boundary(flags, 0), Ok(None));
+    /// ```
+    ///
+    /// And an example that uses partial strings:
+    ///
+    /// ```rust
+    /// # use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
+    /// let s = "abcd";
+    /// let mut cursor = GraphemeCursor::new(0, s.len(), false);
+    /// assert_eq!(cursor.next_boundary(&s[..2], 0), Ok(Some(1)));
+    /// assert_eq!(cursor.next_boundary(&s[..2], 0), Err(GraphemeIncomplete::NextChunk));
+    /// assert_eq!(cursor.next_boundary(&s[2..4], 2), Ok(Some(2)));
+    /// assert_eq!(cursor.next_boundary(&s[2..4], 2), Ok(Some(3)));
+    /// assert_eq!(cursor.next_boundary(&s[2..4], 2), Ok(Some(4)));
+    /// assert_eq!(cursor.next_boundary(&s[2..4], 2), Ok(None));
+    /// ```
     pub fn next_boundary(&mut self, chunk: &str, chunk_start: usize) -> Result<Option<usize>, GraphemeIncomplete> {
         use tables::grapheme as gr;
         if self.offset == self.len {
@@ -509,6 +614,30 @@ impl GraphemeCursor {
     /// given, then retry.
     ///
     /// See `is_boundary` for expectations on the provided chunk.
+    ///
+    /// ```rust
+    /// # use unicode_segmentation::GraphemeCursor;
+    /// let flags = "\u{1F1F7}\u{1F1F8}\u{1F1EE}\u{1F1F4}";
+    /// let mut cursor = GraphemeCursor::new(12, flags.len(), false);
+    /// assert_eq!(cursor.prev_boundary(flags, 0), Ok(Some(8)));
+    /// assert_eq!(cursor.prev_boundary(flags, 0), Ok(Some(0)));
+    /// assert_eq!(cursor.prev_boundary(flags, 0), Ok(None));
+    /// ```
+    ///
+    /// And an example that uses partial strings (note the exact return is not
+    /// guaranteed, and may be `PrevChunk` or `PreContext` arbitrarily):
+    ///
+    /// ```rust
+    /// # use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
+    /// let s = "abcd";
+    /// let mut cursor = GraphemeCursor::new(4, s.len(), false);
+    /// assert_eq!(cursor.prev_boundary(&s[2..4], 2), Ok(Some(3)));
+    /// assert_eq!(cursor.prev_boundary(&s[2..4], 2), Err(GraphemeIncomplete::PrevChunk));
+    /// assert_eq!(cursor.prev_boundary(&s[0..2], 0), Ok(Some(2)));
+    /// assert_eq!(cursor.prev_boundary(&s[0..2], 0), Ok(Some(1)));
+    /// assert_eq!(cursor.prev_boundary(&s[0..2], 0), Ok(Some(0)));
+    /// assert_eq!(cursor.prev_boundary(&s[0..2], 0), Ok(None));
+    /// ```
     pub fn prev_boundary(&mut self, chunk: &str, chunk_start: usize) -> Result<Option<usize>, GraphemeIncomplete> {
         use tables::grapheme as gr;
         if self.offset == 0 {
