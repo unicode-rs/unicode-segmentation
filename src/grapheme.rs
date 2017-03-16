@@ -335,7 +335,7 @@ impl GraphemeCursor {
     /// # use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
     /// let flags = "\u{1F1F7}\u{1F1F8}\u{1F1EE}\u{1F1F4}";
     /// let mut cursor = GraphemeCursor::new(8, flags.len(), false);
-    /// // Note enough pre-context to decide if there's a boundary between the two flags.
+    /// // Not enough pre-context to decide if there's a boundary between the two flags.
     /// assert_eq!(cursor.is_boundary(&flags[8..], 8), Err(GraphemeIncomplete::PreContext(8)));
     /// // Provide one more Regional Indicator Symbol of pre-context
     /// cursor.provide_context(&flags[4..8], 4);
