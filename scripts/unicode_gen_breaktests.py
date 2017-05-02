@@ -190,8 +190,23 @@ def create_words_data(f):
     f.write("    // http://www.unicode.org/Public/UNIDATA/auxiliary/WordBreakTest.txt\n")
     unicode.emit_table(f, "TEST_WORD", test, wtype, True, showfun, True)
 
+def create_sentence_data(f):
+    d = load_test_data("auxiliary/SentenceBreakTest.txt")
+
+    test = []
+
+    for (c, i) in d:
+        allchars = [cn for s in c for cn in s]
+        test.append((allchars, c))
+
+    wtype = "&'static [(&'static str, &'static [&'static str])]"
+    f.write("    // official Unicode test data\n")
+    f.write("    // http://www.unicode.org/Public/UNIDATA/auxiliary/SentenceBreakTest.txt\n")
+    unicode.emit_table(f, "TEST_SENTENCE", test, wtype, True, showfun, True)
+
 if __name__ == "__main__":
     with open("testdata.rs", "w") as rf:
         rf.write(unicode.preamble)
         create_grapheme_data(rf)
         create_words_data(rf)
+        create_sentence_data(rf)
