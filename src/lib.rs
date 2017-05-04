@@ -8,7 +8,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-//! Iterators which split strings on Grapheme Cluster or Word boundaries, according
+//! Iterators which split strings on Grapheme Cluster, Word or Sentence boundaries, according
 //! to the [Unicode Standard Annex #29](http://www.unicode.org/reports/tr29/) rules.
 //!
 //! ```rust
@@ -67,10 +67,12 @@ pub use grapheme::{Graphemes, GraphemeIndices};
 pub use grapheme::{GraphemeCursor, GraphemeIncomplete};
 pub use tables::UNICODE_VERSION;
 pub use word::{UWordBounds, UWordBoundIndices, UnicodeWords};
+pub use sentence::{USentenceBounds};
 
 mod grapheme;
 mod tables;
 mod word;
+mod sentence;
 
 #[cfg(test)]
 mod test;
@@ -174,6 +176,12 @@ pub trait UnicodeSegmentation {
     /// assert_eq!(&swi1[..], b);
     /// ```
     fn split_word_bound_indices<'a>(&'a self) -> UWordBoundIndices<'a>;
+
+    /// Returns an iterator over substrings of `self` separated on
+    /// [UAX#29 sentence boundaries](http://www.unicode.org/reports/tr29/#Sentence_Boundaries).
+    ///
+    /// The concatenation of the substrings returned by this function is just the original string.
+    fn split_sentence_bounds<'a>(&'a self) -> USentenceBounds<'a>;
 }
 
 impl UnicodeSegmentation for str {
@@ -200,5 +208,10 @@ impl UnicodeSegmentation for str {
     #[inline]
     fn split_word_bound_indices(&self) -> UWordBoundIndices {
         word::new_word_bound_indices(self)
+    }
+
+    #[inline]
+    fn split_sentence_bounds(&self) -> USentenceBounds {
+        sentence::new_sentence_bounds(self)
     }
 }
