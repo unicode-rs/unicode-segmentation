@@ -1,5 +1,7 @@
 language: rust
-rust: stable
+rust:
+  - 1.24.0
+  - stable
 os: linux
 script:
   - cargo build --verbose
@@ -7,6 +9,7 @@ script:
   - rustdoc --test README.md -L target/debug -L target/debug/deps
   - cargo doc
 after_success: |
+  [ $TRAVIS_RUST_VERSION = stable ] &&
   [ $TRAVIS_BRANCH = master ] &&
   [ $TRAVIS_PULL_REQUEST = false ] &&
   echo '<meta http-equiv=refresh content=0;url=unicode_segmentation/index.html>' > target/doc/index.html &&
