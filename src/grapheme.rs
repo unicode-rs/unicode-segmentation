@@ -219,7 +219,7 @@ pub enum GraphemeIncomplete {
 enum PairResult {
     NotBreak, // definitely not a break
     Break,    // definitely a break
-    Extended, // a break iff not in extended mode
+    Extended, // a break if not in extended mode
     Regional, // a break if preceded by an even number of RIS
     Emoji,    // a break if preceded by emoji base and (Extend)*
 }
