@@ -1,5 +1,8 @@
 target
 Cargo.lock
+**/*.rs.bk
 scripts/tmp
 *.pyc
 *.txt
+/.idea/
+/unicode-segmentation.iml
