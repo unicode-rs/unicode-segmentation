@@ -44,20 +44,28 @@ fn test_graphemes() {
         // test forward iterator
         assert!(UnicodeSegmentation::graphemes(s, true).eq(g.iter().cloned()));
         assert!(UnicodeSegmentation::graphemes(s, false).eq(g.iter().cloned()));
+        assert!(UnicodeSegmentation::extended_graphemes(s).eq(g.iter().cloned()));
+        assert!(UnicodeSegmentation::legacy_graphemes(s).eq(g.iter().cloned()));
 
         // test reverse iterator
         assert!(UnicodeSegmentation::graphemes(s, true).rev().eq(g.iter().rev().cloned()));
         assert!(UnicodeSegmentation::graphemes(s, false).rev().eq(g.iter().rev().cloned()));
+        assert!(UnicodeSegmentation::extended_graphemes(s).rev().eq(g.iter().rev().cloned()));
+        assert!(UnicodeSegmentation::legacy_graphemes(s).rev().eq(g.iter().rev().cloned()));
     }
 
     for &(s, gt, gf) in TEST_DIFF.iter().chain(EXTRA_DIFF) {
         // test forward iterator
         assert!(UnicodeSegmentation::graphemes(s, true).eq(gt.iter().cloned()));
         assert!(UnicodeSegmentation::graphemes(s, false).eq(gf.iter().cloned()));
+        assert!(UnicodeSegmentation::extended_graphemes(s).eq(gt.iter().cloned()));
+        assert!(UnicodeSegmentation::legacy_graphemes(s).eq(gf.iter().cloned()));
 
         // test reverse iterator
         assert!(UnicodeSegmentation::graphemes(s, true).rev().eq(gt.iter().rev().cloned()));
         assert!(UnicodeSegmentation::graphemes(s, false).rev().eq(gf.iter().rev().cloned()));
+        assert!(UnicodeSegmentation::extended_graphemes(s).rev().eq(gt.iter().rev().cloned()));
+        assert!(UnicodeSegmentation::legacy_graphemes(s).rev().eq(gf.iter().rev().cloned()));
     }
 
     // test the indices iterators
