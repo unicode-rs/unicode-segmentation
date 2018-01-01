@@ -22,4 +22,4 @@ exclude = [ "target/*", "Cargo.lock", "scripts/tmp", "*.txt" ]
 no_std = [] # This is a no-op, preserved for backward compatibility only.
 
 [dev-dependencies]
-quickcheck = "0.4"
+quickcheck = "0.6"
