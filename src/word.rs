@@ -44,6 +44,9 @@ pub struct UWordBounds<'a> {
 }
 
 /// External iterator for word boundaries and byte offsets.
+///
+/// Yields `(usize, &str)` pairs carrying string slices delimited by word
+/// boundaries and their positions.
 #[derive(Clone)]
 pub struct UWordBoundIndices<'a> {
     start_offset: usize,
