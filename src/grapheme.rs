@@ -360,7 +360,10 @@ impl GraphemeCursor {
         match self.state {
             GraphemeState::Regional => self.handle_regional(chunk, chunk_start),
             GraphemeState::Emoji => self.handle_emoji(chunk, chunk_start),
-            _ => panic!("invalid state")
+            _ => if self.cat_before.is_none() && self.offset == chunk.len() + chunk_start {
+                let ch = chunk.chars().rev().next().unwrap();
+                self.cat_before = Some(gr::grapheme_category(ch));
+            },
         }
     }
 
@@ -406,6 +409,7 @@ impl GraphemeCursor {
             return;
         }
         self.pre_context_offset = Some(chunk_start);
+        self.state = GraphemeState::Regional;
     }
 
     fn handle_emoji(&mut self, chunk: &str, chunk_start: usize) {
@@ -428,6 +432,7 @@ impl GraphemeCursor {
             return;
         }
         self.pre_context_offset = Some(chunk_start);
+        self.state = GraphemeState::Emoji;
     }
 
     /// Determine whether the current cursor location is a grapheme cluster boundary.
@@ -662,6 +667,23 @@ impl GraphemeCursor {
             self.resuming = false;
         }
     }
+}
+
+fn test_grapheme_cursor_ris_precontext() {
+    let s = "\u{1f1fa}\u{1f1f8}\u{1f1fa}\u{1f1f8}\u{1f1fa}\u{1f1f8}";
+    let mut c = GraphemeCursor::new(8, s.len(), true);
+    assert_eq!(c.is_boundary(&s[4..], 4), Err(GraphemeIncomplete::PreContext(4)));
+    c.provide_context(&s[..4], 0);
+    assert_eq!(c.is_boundary(&s[4..], 4), Ok(true));
+}
+
+#[test]
+fn test_grapheme_cursor_chunk_start_require_precontext() {
+    let s = "\r\n";
+    let mut c = GraphemeCursor::new(1, s.len(), true);
+    assert_eq!(c.is_boundary(&s[1..], 1), Err(GraphemeIncomplete::PreContext(1)));
+    c.provide_context(&s[..1], 0);
+    assert_eq!(c.is_boundary(&s[1..], 1), Ok(false));
 }
 
 #[test]
