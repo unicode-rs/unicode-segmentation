@@ -11,9 +11,9 @@ extern crate unicode_segmentation;
 use unicode_segmentation::UnicodeSegmentation;
 
 fn main() {
-    let s = "a̐éö̲\r\n";
+    let s = "a̐éö̲\r\n";
     let g = UnicodeSegmentation::graphemes(s, true).collect::<Vec<&str>>();
-    let b: &[_] = &["a̐", "é", "ö̲", "\r\n"];
+    let b: &[_] = &["a̐", "é", "ö̲", "\r\n"];
     assert_eq!(g, b);
 
     let s = "The quick (\"brown\") fox can't jump 32.3 feet, right?";
@@ -40,7 +40,7 @@ to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-unicode-segmentation = "1.1.0"
+unicode-segmentation = "1.2.1"
 ```
 
 # Change Log
