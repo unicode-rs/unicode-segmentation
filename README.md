@@ -45,6 +45,13 @@ unicode-segmentation = "1.2.1"
 
 # Change Log
 
+## 1.2.1
+
+* [#37](https://github.com/unicode-rs/unicode-segmentation/pull/37):
+  Fix panic in `provide_context`.
+* [#40](https://github.com/unicode-rs/unicode-segmentation/pull/40):
+  Fix crash in `prev_boundary`.
+
 ## 1.2.0
 
 * New `GraphemeCursor` API allows random access and bidirectional iteration.
