@@ -16,6 +16,8 @@ mod fwd {
     use tables::sentence::SentenceCat;
     use core::cmp;
 
+    // Describe a parsed part of source string as described in this table:
+    // https://unicode.org/reports/tr29/#Default_Sentence_Boundaries
     #[derive(Clone, Copy, PartialEq, Eq)]
     enum StatePart {
         Sot,
@@ -49,6 +51,8 @@ mod fwd {
     }
 
     impl SentenceBreaksState {
+        // Attempt to advance the internal state by one part
+        // Whitespace and some punctutation will be collapsed
         fn next(&self, cat: SentenceCat) -> SentenceBreaksState {
             let &SentenceBreaksState(parts) = self;
             let parts = match (parts[3], cat) {
@@ -85,27 +89,28 @@ mod fwd {
             ])
         }
 
+        // Helper function to check if state head matches a single `StatePart`
         fn match1(&self, part: StatePart) -> bool {
             let &SentenceBreaksState(parts) = self;
             part == parts[3]
         }
 
+        // Helper function to check if first two `StateParts` in state match
+        // the given two
         fn match2(&self, part1: StatePart, part2: StatePart) -> bool {
             let &SentenceBreaksState(parts) = self;
             part1 == parts[2] && part2 == parts[3]
         }
     }
 
+    // https://unicode.org/reports/tr29/#SB8
+    // TODO cache this, it is currently quadratic
     fn match_sb8(state: &SentenceBreaksState, ahead: &str) -> bool {
-        let aterm_part = {
-            // ATerm Close* Sp*
-            let &SentenceBreaksState(parts) = state;
-            let mut idx = if parts[3] == StatePart::SpPlus { 2 } else { 3 };
-            if parts[idx] == StatePart::ClosePlus { idx -= 1 }
-            parts[idx]
-        };
+        let &SentenceBreaksState(parts) = state;
+        let mut idx = if parts[3] == StatePart::SpPlus { 2 } else { 3 };
+        if parts[idx] == StatePart::ClosePlus { idx -= 1 }
 
-        if aterm_part == StatePart::ATerm {
+        if parts[idx] == StatePart::ATerm {
             use tables::sentence as se;
 
             for next_char in ahead.chars() {
@@ -124,6 +129,7 @@ mod fwd {
         false
     }
 
+    // https://unicode.org/reports/tr29/#SB8a
     fn match_sb8a(state: &SentenceBreaksState) -> bool {
         // SATerm Close* Sp*
         let &SentenceBreaksState(parts) = state;
@@ -132,6 +138,7 @@ mod fwd {
         parts[idx] == StatePart::STerm || parts[idx] == StatePart::ATerm
     }
 
+    // https://unicode.org/reports/tr29/#SB9
     fn match_sb9(state: &SentenceBreaksState) -> bool {
         // SATerm Close*
         let &SentenceBreaksState(parts) = state;
@@ -139,6 +146,7 @@ mod fwd {
         parts[idx] == StatePart::STerm || parts[idx] == StatePart::ATerm
     }
 
+    // https://unicode.org/reports/tr29/#SB11
     fn match_sb11(state: &SentenceBreaksState) -> bool {
         // SATerm Close* Sp* ParaSep?
         let &SentenceBreaksState(parts) = state;
@@ -180,43 +188,45 @@ mod fwd {
                 self.state = self.state.next(next_cat);
 
                 match next_cat {
-                    // SB1
+                    // SB1 https://unicode.org/reports/tr29/#SB1
                     _ if state_before.match1(StatePart::Sot) =>
                         return Some(position_before),
 
-                    // SB3
+                    // SB2 is handled when inner iterator (chars) is finished
+
+                    // SB3 https://unicode.org/reports/tr29/#SB3
                     SentenceCat::SC_LF if state_before.match1(StatePart::CR) =>
                         continue,
 
-                    // SB4
+                    // SB4 https://unicode.org/reports/tr29/#SB4
                     _ if state_before.match1(StatePart::Sep)
                         || state_before.match1(StatePart::CR)
                         || state_before.match1(StatePart::LF)
                     => return Some(position_before),
 
-                    // SB5
+                    // SB5 https://unicode.org/reports/tr29/#SB5
                     SentenceCat::SC_Extend |
                     SentenceCat::SC_Format => self.state = state_before,
 
-                    // SB6
+                    // SB6 https://unicode.org/reports/tr29/#SB6
                     SentenceCat::SC_Numeric if state_before.match1(StatePart::ATerm) =>
                         continue,
 
-                    // SB7
+                    // SB7 https://unicode.org/reports/tr29/#SB7
                     SentenceCat::SC_Upper if state_before.match2(StatePart::UpperLower, StatePart::ATerm) =>
                         continue,
 
-                    // SB8
+                    // SB8 https://unicode.org/reports/tr29/#SB8
                     _ if match_sb8(&state_before, &self.string[position_before..]) =>
                         continue,
 
-                    // SB8a
+                    // SB8a https://unicode.org/reports/tr29/#SB8a
                     SentenceCat::SC_SContinue |
                     SentenceCat::SC_STerm |
                     SentenceCat::SC_ATerm if match_sb8a(&state_before) =>
                         continue,
 
-                    // SB9
+                    // SB9 https://unicode.org/reports/tr29/#SB9
                     SentenceCat::SC_Close |
                     SentenceCat::SC_Sp |
                     SentenceCat::SC_Sep |
@@ -224,23 +234,23 @@ mod fwd {
                     SentenceCat::SC_LF if match_sb9(&state_before) =>
                         continue,
 
-                    // SB10
+                    // SB10 https://unicode.org/reports/tr29/#SB10
                     SentenceCat::SC_Sp |
                     SentenceCat::SC_Sep |
                     SentenceCat::SC_CR |
                     SentenceCat::SC_LF if match_sb8a(&state_before) =>
                         continue,
 
-                    // SB11
+                    // SB11 https://unicode.org/reports/tr29/#SB11
                     _ if match_sb11(&state_before) =>
                         return Some(position_before),
 
-                    // SB998
+                    // SB998 https://unicode.org/reports/tr29/#SB998
                     _ => continue
                 }
             }
 
-            // SB2
+            // SB2 https://unicode.org/reports/tr29/#SB2
             if self.state.match1(StatePart::Sot) {
                 None
             } else if self.state.match1(StatePart::Eot) {
