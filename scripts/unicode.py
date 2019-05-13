@@ -22,7 +22,7 @@
 
 import fileinput, re, os, sys, operator
 
-preamble = '''// Copyright 2012-2015 The Rust Project Developers. See the COPYRIGHT
+preamble = '''// Copyright 2012-2018 The Rust Project Developers. See the COPYRIGHT
 // file at the top-level directory of this distribution and at
 // http://rust-lang.org/COPYRIGHT.
 //
@@ -43,7 +43,7 @@ expanded_categories = {
     'Lu': ['LC', 'L'], 'Ll': ['LC', 'L'], 'Lt': ['LC', 'L'],
     'Lm': ['L'], 'Lo': ['L'],
     'Mn': ['M'], 'Mc': ['M'], 'Me': ['M'],
-    'Nd': ['N'], 'Nl': ['N'], 'No': ['No'],
+    'Nd': ['N'], 'Nl': ['N'], 'No': ['N'],
     'Pc': ['P'], 'Pd': ['P'], 'Ps': ['P'], 'Pe': ['P'],
     'Pi': ['P'], 'Pf': ['P'], 'Po': ['P'],
     'Sm': ['S'], 'Sc': ['S'], 'Sk': ['S'], 'So': ['S'],
