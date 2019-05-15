@@ -141,6 +141,27 @@ fn test_words() {
     }
 }
 
+
+#[test]
+fn test_sentences() {
+    use testdata::TEST_SENTENCE;
+
+    for &(s, w) in TEST_SENTENCE.iter() {
+        macro_rules! assert_ {
+            ($test:expr, $exp:expr, $name:expr) => {
+                // collect into vector for better diagnostics in failure case
+                let testing = $test.collect::<Vec<_>>();
+                let expected = $exp.collect::<Vec<_>>();
+                assert_eq!(testing, expected, "{} test for testcase ({:?}, {:?}) failed.", $name, s, w)
+            }
+        }
+
+        assert_!(s.split_sentence_bounds(),
+                w.iter().cloned(),
+                "Forward sentence boundaries");
+    }
+}
+
 quickcheck! {
     fn quickcheck_forward_reverse_graphemes_extended(s: String) -> bool {
         let a = s.graphemes(true).collect::<Vec<_>>();

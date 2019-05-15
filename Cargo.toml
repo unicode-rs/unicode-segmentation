@@ -12,7 +12,7 @@ license = "MIT/Apache-2.0"
 keywords = ["text", "unicode", "grapheme", "word", "boundary"]
 readme = "README.md"
 description = """
-This crate provides Grapheme Cluster and Word boundaries
+This crate provides Grapheme Cluster, Word and Sentence boundaries
 according to Unicode Standard Annex #29 rules.
 """
 
