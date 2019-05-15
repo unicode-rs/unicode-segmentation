@@ -40,10 +40,15 @@ to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-unicode-segmentation = "1.2.1"
+unicode-segmentation = "1.3.0"
 ```
 
 # Change Log
+
+## 1.3.0
+
+* [#24](https://github.com/unicode-rs/unicode-segmentation/pull/24) Add support for sentence boundaries
+* [#44](https://github.com/unicode-rs/unicode-segmentation/pull/44) Treat `gc=No` as a subset of `gc=N`
 
 ## 1.2.1
 
