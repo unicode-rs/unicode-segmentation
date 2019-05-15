@@ -20,7 +20,7 @@
 # Since this should not require frequent updates, we just store this
 # out-of-line and check the unicode.rs file into git.
 
-import fileinput, re, os, sys, operator
+import fileinput, re, os, sys
 
 preamble = '''// Copyright 2012-2018 The Rust Project Developers. See the COPYRIGHT
 // file at the top-level directory of this distribution and at
@@ -59,7 +59,7 @@ def is_surrogate(n):
 
 def fetch(f):
     if not os.path.exists(os.path.basename(f)):
-        os.system("curl -O http://www.unicode.org/Public/UNIDATA/%s"
+        os.system("curl -O http://www.unicode.org/Public/9.0.0/ucd/%s"
                   % f)
 
     if not os.path.exists(os.path.basename(f)):
@@ -80,7 +80,7 @@ def load_gencats(f):
         if is_surrogate(cp):
             continue
         if range_start >= 0:
-            for i in xrange(range_start, cp):
+            for i in range(range_start, cp):
                 udict[i] = data;
             range_start = -1;
         if data[1].endswith(", First>"):
@@ -150,8 +150,8 @@ def format_table_content(f, content, indent):
 def load_properties(f, interestingprops):
     fetch(f)
     props = {}
-    re1 = re.compile("^ *([0-9A-F]+) *; *(\w+)")
-    re2 = re.compile("^ *([0-9A-F]+)\.\.([0-9A-F]+) *; *(\w+)")
+    re1 = re.compile(r"^ *([0-9A-F]+) *; *(\w+)")
+    re2 = re.compile(r"^ *([0-9A-F]+)\.\.([0-9A-F]+) *; *(\w+)")
 
     for line in fileinput.input(os.path.basename(f)):
         prop = None
@@ -309,7 +309,7 @@ if __name__ == "__main__":
         # download and parse all the data
         fetch("ReadMe.txt")
         with open("ReadMe.txt") as readme:
-            pattern = "for Version (\d+)\.(\d+)\.(\d+) of the Unicode"
+            pattern = r"for Version (\d+)\.(\d+)\.(\d+) of the Unicode"
             unicode_version = re.search(pattern, readme.read()).groups()
         rf.write("""
 /// The version of [Unicode](http://www.unicode.org/)
@@ -342,7 +342,7 @@ pub const UNICODE_VERSION: (u64, u64, u64) = (%s, %s, %s);
         for cat in grapheme_cats:
             grapheme_table.extend([(x, y, cat) for (x, y) in grapheme_cats[cat]])
         grapheme_table.sort(key=lambda w: w[0])
-        emit_break_module(rf, grapheme_table, grapheme_cats.keys(), "grapheme")
+        emit_break_module(rf, grapheme_table, list(grapheme_cats.keys()), "grapheme")
         rf.write("\n")
 
         word_cats = load_properties("auxiliary/WordBreakProperty.txt", [])
@@ -350,4 +350,4 @@ pub const UNICODE_VERSION: (u64, u64, u64) = (%s, %s, %s);
         for cat in word_cats:
             word_table.extend([(x, y, cat) for (x, y) in word_cats[cat]])
         word_table.sort(key=lambda w: w[0])
-        emit_break_module(rf, word_table, word_cats.keys(), "word")
+        emit_break_module(rf, word_table, list(word_cats.keys()), "word")
