@@ -59,7 +59,7 @@ def is_surrogate(n):
 
 def fetch(f):
     if not os.path.exists(os.path.basename(f)):
-        os.system("curl -O http://www.unicode.org/Public/9.0.0/ucd/%s"
+        os.system("curl -O http://www.unicode.org/Public/10.0.0/ucd/%s"
                   % f)
 
     if not os.path.exists(os.path.basename(f)):
