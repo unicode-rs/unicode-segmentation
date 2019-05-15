@@ -1,4 +1,4 @@
-// Copyright 2012-2015 The Rust Project Developers. See the COPYRIGHT
+// Copyright 2012-2018 The Rust Project Developers. See the COPYRIGHT
 // file at the top-level directory of this distribution and at
 // http://rust-lang.org/COPYRIGHT.
 //
@@ -12,7 +12,7 @@
 
 #![allow(missing_docs, non_upper_case_globals, non_snake_case)]
     // official Unicode test data
-    // http://www.unicode.org/Public/UNIDATA/auxiliary/GraphemeBreakTest.txt
+    // http://www.unicode.org/Public/9.0.0/ucd/auxiliary/GraphemeBreakTest.txt
     pub const TEST_SAME: &'static [(&'static str, &'static [&'static str])] = &[
         ("\u{20}\u{20}", &["\u{20}", "\u{20}"]), ("\u{20}\u{308}\u{20}", &["\u{20}\u{308}",
         "\u{20}"]), ("\u{20}\u{d}", &["\u{20}", "\u{d}"]), ("\u{20}\u{308}\u{d}", &["\u{20}\u{308}",
@@ -516,7 +516,7 @@
     ];
 
     // official Unicode test data
-    // http://www.unicode.org/Public/UNIDATA/auxiliary/WordBreakTest.txt
+    // http://www.unicode.org/Public/9.0.0/ucd/auxiliary/WordBreakTest.txt
     pub const TEST_WORD: &'static [(&'static str, &'static [&'static str])] = &[
         ("\u{1}\u{1}", &["\u{1}", "\u{1}"]), ("\u{1}\u{308}\u{1}", &["\u{1}\u{308}", "\u{1}"]),
         ("\u{1}\u{d}", &["\u{1}", "\u{d}"]), ("\u{1}\u{308}\u{d}", &["\u{1}\u{308}", "\u{d}"]),
