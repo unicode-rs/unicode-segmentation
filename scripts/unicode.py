@@ -351,3 +351,10 @@ pub const UNICODE_VERSION: (u64, u64, u64) = (%s, %s, %s);
             word_table.extend([(x, y, cat) for (x, y) in word_cats[cat]])
         word_table.sort(key=lambda w: w[0])
         emit_break_module(rf, word_table, list(word_cats.keys()), "word")
+
+        sentence_cats = load_properties("auxiliary/SentenceBreakProperty.txt", [])
+        sentence_table = []
+        for cat in sentence_cats:
+            sentence_table.extend([(x, y, cat) for (x, y) in sentence_cats[cat]])
+        sentence_table.sort(key=lambda w: w[0])
+        emit_break_module(rf, sentence_table, list(sentence_cats.keys()), "sentence")
