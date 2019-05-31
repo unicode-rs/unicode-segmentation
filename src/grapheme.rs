@@ -310,6 +310,7 @@ impl GraphemeCursor {
         }
     }
 
+    #[inline]
     /// The current offset of the cursor. Equal to the last value provided to
     /// `new()` or `set_cursor()`, or returned from `next_boundary()` or
     /// `prev_boundary()`.
