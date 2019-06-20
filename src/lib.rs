@@ -12,8 +12,6 @@
 //! to the [Unicode Standard Annex #29](http://www.unicode.org/reports/tr29/) rules.
 //!
 //! ```rust
-//! extern crate unicode_segmentation;
-//!
 //! use unicode_segmentation::UnicodeSegmentation;
 //!
 //! fn main() {
