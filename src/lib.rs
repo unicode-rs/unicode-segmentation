@@ -63,11 +63,11 @@ extern crate std;
 #[macro_use]
 extern crate quickcheck;
 
-pub use grapheme::{Graphemes, GraphemeIndices};
-pub use grapheme::{GraphemeCursor, GraphemeIncomplete};
-pub use tables::UNICODE_VERSION;
-pub use word::{UWordBounds, UWordBoundIndices, UnicodeWords};
-pub use sentence::{USentenceBounds, USentenceBoundIndices, UnicodeSentences};
+pub use crate::grapheme::{Graphemes, GraphemeIndices};
+pub use crate::grapheme::{GraphemeCursor, GraphemeIncomplete};
+pub use crate::tables::UNICODE_VERSION;
+pub use crate::word::{UWordBounds, UWordBoundIndices, UnicodeWords};
+pub use crate::sentence::{USentenceBounds, USentenceBoundIndices, UnicodeSentences};
 
 mod grapheme;
 mod tables;
