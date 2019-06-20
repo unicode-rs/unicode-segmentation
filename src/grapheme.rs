@@ -10,7 +10,7 @@
 
 use core::cmp;
 
-use tables::grapheme::GraphemeCat;
+use crate::tables::grapheme::GraphemeCat;
 
 /// External iterator for grapheme clusters and byte offsets.
 #[derive(Clone)]
@@ -215,7 +215,7 @@ enum PairResult {
 }
 
 fn check_pair(before: GraphemeCat, after: GraphemeCat) -> PairResult {
-    use tables::grapheme::GraphemeCat::*;
+    use crate::tables::grapheme::GraphemeCat::*;
     use self::PairResult::*;
     match (before, after) {
         (GC_CR, GC_LF) => NotBreak,  // GB3
@@ -348,7 +348,7 @@ impl GraphemeCursor {
     /// assert_eq!(cursor.is_boundary(&flags[8..], 8), Ok(true));
     /// ```
     pub fn provide_context(&mut self, chunk: &str, chunk_start: usize) {
-        use tables::grapheme as gr;
+        use crate::tables::grapheme as gr;
         assert!(chunk_start + chunk.len() == self.pre_context_offset.unwrap());
         self.pre_context_offset = None;
         if self.is_extended && chunk_start + chunk.len() == self.offset {
@@ -394,7 +394,7 @@ impl GraphemeCursor {
     }
 
     fn handle_regional(&mut self, chunk: &str, chunk_start: usize) {
-        use tables::grapheme as gr;
+        use crate::tables::grapheme as gr;
         let mut ris_count = self.ris_count.unwrap_or(0);
         for ch in chunk.chars().rev() {
             if gr::grapheme_category(ch) != gr::GC_Regional_Indicator {
@@ -414,7 +414,7 @@ impl GraphemeCursor {
     }
 
     fn handle_emoji(&mut self, chunk: &str, chunk_start: usize) {
-        use tables::grapheme as gr;
+        use crate::tables::grapheme as gr;
         for ch in chunk.chars().rev() {
             match gr::grapheme_category(ch) {
                 gr::GC_Extend => (),
@@ -460,7 +460,7 @@ impl GraphemeCursor {
     /// assert_eq!(cursor.is_boundary(flags, 0), Ok(false));
     /// ```
     pub fn is_boundary(&mut self, chunk: &str, chunk_start: usize) -> Result<bool, GraphemeIncomplete> {
-        use tables::grapheme as gr;
+        use crate::tables::grapheme as gr;
         if self.state == GraphemeState::Break {
             return Ok(true)
         }
@@ -550,7 +550,7 @@ impl GraphemeCursor {
     /// assert_eq!(cursor.next_boundary(&s[2..4], 2), Ok(None));
     /// ```
     pub fn next_boundary(&mut self, chunk: &str, chunk_start: usize) -> Result<Option<usize>, GraphemeIncomplete> {
-        use tables::grapheme as gr;
+        use crate::tables::grapheme as gr;
         if self.offset == self.len {
             return Ok(None);
         }
@@ -626,7 +626,7 @@ impl GraphemeCursor {
     /// assert_eq!(cursor.prev_boundary(&s[0..2], 0), Ok(None));
     /// ```
     pub fn prev_boundary(&mut self, chunk: &str, chunk_start: usize) -> Result<Option<usize>, GraphemeIncomplete> {
-        use tables::grapheme as gr;
+        use crate::tables::grapheme as gr;
         if self.offset == 0 {
             return Ok(None);
         }
