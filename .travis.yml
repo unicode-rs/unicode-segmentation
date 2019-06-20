@@ -6,7 +6,6 @@ os: linux
 script:
   - cargo build --verbose
   - cargo test --verbose
-  - rustdoc --test README.md -L target/debug -L target/debug/deps
   - cargo doc
 after_success: |
   [ $TRAVIS_RUST_VERSION = stable ] &&
