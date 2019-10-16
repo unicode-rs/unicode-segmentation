@@ -28,6 +28,7 @@ pub mod util {
     }
 
     #[inline]
+    #[allow(ellipsis_inclusive_range_patterns)]
     fn is_alphabetic(c: char) -> bool {
         match c {
             'a' ... 'z' | 'A' ... 'Z' => true,
@@ -37,6 +38,7 @@ pub mod util {
     }
 
     #[inline]
+    #[allow(ellipsis_inclusive_range_patterns)]
     fn is_numeric(c: char) -> bool {
         match c {
             '0' ... '9' => true,
