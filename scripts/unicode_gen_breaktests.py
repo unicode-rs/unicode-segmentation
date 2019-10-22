@@ -172,7 +172,7 @@ def create_grapheme_data(f):
     stype = "&'static [(&'static str, &'static [&'static str])]"
     dtype = "&'static [(&'static str, &'static [&'static str], &'static [&'static str])]"
     f.write("    // official Unicode test data\n")
-    f.write("    // http://www.unicode.org/Public/9.0.0/ucd/auxiliary/GraphemeBreakTest.txt\n")
+    f.write("    // http://www.unicode.org/Public/10.0.0/ucd/auxiliary/GraphemeBreakTest.txt\n")
     unicode.emit_table(f, "TEST_SAME", test_same, stype, True, showfun, True)
     unicode.emit_table(f, "TEST_DIFF", test_diff, dtype, True, showfun, True)
 
@@ -187,7 +187,7 @@ def create_words_data(f):
 
     wtype = "&'static [(&'static str, &'static [&'static str])]"
     f.write("    // official Unicode test data\n")
-    f.write("    // http://www.unicode.org/Public/9.0.0/ucd/auxiliary/WordBreakTest.txt\n")
+    f.write("    // http://www.unicode.org/Public/10.0.0/ucd/auxiliary/WordBreakTest.txt\n")
     unicode.emit_table(f, "TEST_WORD", test, wtype, True, showfun, True)
 
 def create_sentence_data(f):
@@ -201,7 +201,7 @@ def create_sentence_data(f):
 
     wtype = "&'static [(&'static str, &'static [&'static str])]"
     f.write("    // official Unicode test data\n")
-    f.write("    // http://www.unicode.org/Public/UNIDATA/auxiliary/SentenceBreakTest.txt\n")
+    f.write("    // http://www.unicode.org/Public/10.0.0/ucd/auxiliary/SentenceBreakTest.txt\n")
     unicode.emit_table(f, "TEST_SENTENCE", test, wtype, True, showfun, True)
 
 if __name__ == "__main__":
