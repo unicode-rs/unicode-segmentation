@@ -54,7 +54,7 @@ expanded_categories = {
 # these are the surrogate codepoints, which are not valid rust characters
 surrogate_codepoints = (0xd800, 0xdfff)
 
-UNICODE_VERSION = (10, 0, 0)
+UNICODE_VERSION = (11, 0, 0)
 
 UNICODE_VERSION_NUMBER = "%s.%s.%s" %UNICODE_VERSION
 
@@ -63,8 +63,12 @@ def is_surrogate(n):
 
 def fetch(f):
     if not os.path.exists(os.path.basename(f)):
-        os.system("curl -O http://www.unicode.org/Public/%s/ucd/%s"
-                  % (UNICODE_VERSION_NUMBER, f))
+        if "emoji" in f:
+            os.system("curl -O https://www.unicode.org/Public/emoji/%s.%s/%s"
+                      % (UNICODE_VERSION[0], UNICODE_VERSION[1], f))
+        else:
+            os.system("curl -O http://www.unicode.org/Public/%s/ucd/%s"
+                      % (UNICODE_VERSION_NUMBER, f))
 
     if not os.path.exists(os.path.basename(f)):
         sys.stderr.write("cannot load %s" % f)
@@ -266,7 +270,7 @@ def emit_break_module(f, break_table, break_cats, name):
     pub use self::%sCat::*;
 
     #[allow(non_camel_case_types)]
-    #[derive(Clone, Copy, PartialEq, Eq)]
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
     pub enum %sCat {
 """ % (name, Name, Name))
 
@@ -340,8 +344,15 @@ pub const UNICODE_VERSION: (u64, u64, u64) = (%s, %s, %s);
         grapheme_table = []
         for cat in grapheme_cats:
             grapheme_table.extend([(x, y, cat) for (x, y) in grapheme_cats[cat]])
+        emoji_props = load_properties("emoji-data.txt", ["Extended_Pictographic"])
+        grapheme_table.extend([(x, y, "Extended_Pictographic") for (x, y) in emoji_props["Extended_Pictographic"]])
         grapheme_table.sort(key=lambda w: w[0])
-        emit_break_module(rf, grapheme_table, list(grapheme_cats.keys()), "grapheme")
+        last = -1
+        for chars in grapheme_table:
+            if chars[0] <= last:
+                raise "Grapheme tables and Extended_Pictographic values overlap; need to store these separately!"
+            last = chars[1]
+        emit_break_module(rf, grapheme_table, list(grapheme_cats.keys()) + ["Extended_Pictographic"], "grapheme")
         rf.write("\n")
 
         word_cats = load_properties("auxiliary/WordBreakProperty.txt", [])
@@ -350,6 +361,11 @@ pub const UNICODE_VERSION: (u64, u64, u64) = (%s, %s, %s);
             word_table.extend([(x, y, cat) for (x, y) in word_cats[cat]])
         word_table.sort(key=lambda w: w[0])
         emit_break_module(rf, word_table, list(word_cats.keys()), "word")
+
+        # There are some emoji which are also ALetter, so this needs to be stored separately
+        # For efficiency, we could still merge the two tables and produce an ALetterEP state
+        emoji_table = [(x, y, "Extended_Pictographic") for (x, y) in emoji_props["Extended_Pictographic"]]
+        emit_break_module(rf, emoji_table, ["Extended_Pictographic"], "emoji")
 
         sentence_cats = load_properties("auxiliary/SentenceBreakProperty.txt", [])
         sentence_table = []
