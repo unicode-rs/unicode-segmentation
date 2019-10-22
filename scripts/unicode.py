@@ -54,13 +54,17 @@ expanded_categories = {
 # these are the surrogate codepoints, which are not valid rust characters
 surrogate_codepoints = (0xd800, 0xdfff)
 
+UNICODE_VERSION = (10, 0, 0)
+
+UNICODE_VERSION_NUMBER = "%s.%s.%s" %UNICODE_VERSION
+
 def is_surrogate(n):
     return surrogate_codepoints[0] <= n <= surrogate_codepoints[1]
 
 def fetch(f):
     if not os.path.exists(os.path.basename(f)):
-        os.system("curl -O http://www.unicode.org/Public/10.0.0/ucd/%s"
-                  % f)
+        os.system("curl -O http://www.unicode.org/Public/%s/ucd/%s"
+                  % (UNICODE_VERSION_NUMBER, f))
 
     if not os.path.exists(os.path.basename(f)):
         sys.stderr.write("cannot load %s" % f)
@@ -305,18 +309,13 @@ if __name__ == "__main__":
     with open(r, "w") as rf:
         # write the file's preamble
         rf.write(preamble)
-
-        # download and parse all the data
-        fetch("ReadMe.txt")
-        with open("ReadMe.txt") as readme:
-            pattern = r"for Version (\d+)\.(\d+)\.(\d+) of the Unicode"
-            unicode_version = re.search(pattern, readme.read()).groups()
         rf.write("""
 /// The version of [Unicode](http://www.unicode.org/)
 /// that this version of unicode-segmentation is based on.
 pub const UNICODE_VERSION: (u64, u64, u64) = (%s, %s, %s);
-""" % unicode_version)
+""" % UNICODE_VERSION)
 
+        # download and parse all the data
         gencats = load_gencats("UnicodeData.txt")
         derived = load_properties("DerivedCoreProperties.txt", ["Alphabetic"])
 
