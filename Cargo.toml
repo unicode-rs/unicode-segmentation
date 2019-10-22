@@ -1,8 +1,8 @@
 [package]
 
 name = "unicode-segmentation"
-version = "1.3.0"
-authors = ["kwantam <kwantam@gmail.com>"]
+version = "1.4.0"
+authors = ["kwantam <kwantam@gmail.com>", "Manish Goregaokar <manishsmail@gmail.com>"]
 
 homepage = "https://github.com/unicode-rs/unicode-segmentation"
 repository = "https://github.com/unicode-rs/unicode-segmentation"

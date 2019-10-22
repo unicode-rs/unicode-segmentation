@@ -43,6 +43,10 @@ unicode-segmentation = "1.3.0"
 
 # Change Log
 
+## 1.4.0
+
+* [#56](https://github.com/unicode-rs/unicode-segmentation/pull/56) Upgrade to Unicode 10
+
 ## 1.3.0
 
 * [#24](https://github.com/unicode-rs/unicode-segmentation/pull/24) Add support for sentence boundaries
