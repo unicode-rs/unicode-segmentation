@@ -102,6 +102,7 @@ enum UWordBoundsState {
     FormatExtend(FormatExtendType),
     Zwj,
     Emoji,
+    WSegSpace,
 }
 
 // subtypes for FormatExtend state in UWordBoundsState
@@ -156,6 +157,8 @@ impl<'a> Iterator for UWordBounds<'a> {
         // Whether or not the previous category was ZWJ
         // ZWJs get collapsed, so this handles precedence of WB3c over WB4
         let mut prev_zwj;
+        // If extend/format/zwj were skipped. Handles precedence of WB3d over WB4
+        let mut skipped_format_extend = false;
         for (curr, ch) in self.string.char_indices() {
             idx = curr;
             prev_zwj = cat == wd::WC_ZWJ;
@@ -177,6 +180,7 @@ impl<'a> Iterator for UWordBounds<'a> {
             if state != Start {
                 match cat {
                     wd::WC_Extend | wd::WC_Format | wd::WC_ZWJ => {
+                        skipped_format_extend = true;
                         continue
                     }
                     _ => {}
@@ -219,6 +223,7 @@ impl<'a> Iterator for UWordBounds<'a> {
                     wd::WC_Regional_Indicator => Regional(RegionalState::Half),  // rule WB13c
                     wd::WC_LF | wd::WC_Newline => break,    // rule WB3a
                     wd::WC_ZWJ => Zwj,                      // rule WB3c
+                    wd::WC_WSegSpace => WSegSpace,          // rule WB3d
                     _ => {
                         if let Some(ncat) = self.get_next_cat(idx) {                // rule WB4
                             if ncat == wd::WC_Format || ncat == wd::WC_Extend || ncat == wd::WC_ZWJ {
@@ -228,6 +233,13 @@ impl<'a> Iterator for UWordBounds<'a> {
                             }
                         }
                         break;                                                      // rule WB999
+                    }
+                },
+                WSegSpace => match cat {
+                    wd::WC_WSegSpace if !skipped_format_extend => WSegSpace,
+                    _ => {
+                        take_curr = false;
+                        break;
                     }
                 },
                 Zwj => {
@@ -371,6 +383,8 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
         let mut savestate = Start;
         let mut cat = wd::WC_Any;
 
+        let mut skipped_format_extend = false;
+
         for (curr, ch) in self.string.char_indices().rev() {
             previdx = idx;
             idx = curr;
@@ -409,6 +423,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                 state = savestate;
                 previdx = saveidx;
                 take_cat = false;
+                skipped_format_extend = true;
             }
 
             // Don't use `continue` in this match without updating `catb`
@@ -427,6 +442,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                         saveidx = idx;
                         FormatExtend(AcceptQLetter)                         // rule WB7a
                     },
+                    wd::WC_WSegSpace => WSegSpace,
                     wd::WC_CR | wd::WC_LF | wd::WC_Newline => {
                         if state == Start {
                             if cat == wd::WC_LF {
@@ -445,6 +461,15 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                 Zwj => match cat {                          // rule WB3c
                     wd::WC_ZWJ => {
                         FormatExtend(AcceptAny)
+                    }
+                    _ => {
+                        take_curr = false;
+                        break;
+                    }
+                },
+                WSegSpace => match cat {                          // rule WB3d
+                    wd::WC_WSegSpace if !skipped_format_extend => {
+                        WSegSpace
                     }
                     _ => {
                         take_curr = false;

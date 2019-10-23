@@ -29,7 +29,7 @@
 //!
 //!     let s = "The quick (\"brown\")  fox";
 //!     let w = s.split_word_bounds().collect::<Vec<&str>>();
-//!     let b: &[_] = &["The", " ", "quick", " ", "(", "\"", "brown", "\"", ")", " ", " ", "fox"];
+//!     let b: &[_] = &["The", " ", "quick", " ", "(", "\"", "brown", "\"", ")", "  ", "fox"];
 //!     assert_eq!(w, b);
 //! }
 //! ```
@@ -156,7 +156,7 @@ pub trait UnicodeSegmentation {
     /// ```
     /// # use self::unicode_segmentation::UnicodeSegmentation;
     /// let swu1 = "The quick (\"brown\")  fox".split_word_bounds().collect::<Vec<&str>>();
-    /// let b: &[_] = &["The", " ", "quick", " ", "(", "\"", "brown", "\"", ")", " ", " ", "fox"];
+    /// let b: &[_] = &["The", " ", "quick", " ", "(", "\"", "brown", "\"", ")", "  ", "fox"];
     ///
     /// assert_eq!(&swu1[..], b);
     /// ```
