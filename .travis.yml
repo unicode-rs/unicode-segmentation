@@ -5,7 +5,8 @@ rust:
 os: linux
 script:
   - cargo build --verbose
-  - [ $TRAVIS_RUST_VERSION = stable ] && cargo test --verbose
+  - |
+    if [ $TRAVIS_RUST_VERSION = stable ]; then cargo test --verbose || travis_terminate 1; fi
   - cargo doc
 after_success: |
   [ $TRAVIS_RUST_VERSION = stable ] &&
