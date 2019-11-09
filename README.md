@@ -43,10 +43,13 @@ unicode-segmentation = "1.3.0"
 
 # Change Log
 
+## 1.6.0
+
+* [#72](https://github.com/unicode-rs/unicode-segmentation/pull/72) Upgrade to Unicode 12
+
 ## 1.5.0
 
 * [#68](https://github.com/unicode-rs/unicode-segmentation/pull/68) Upgrade to Unicode 11
-
 
 ## 1.4.0
 
