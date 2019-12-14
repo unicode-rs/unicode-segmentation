@@ -10,7 +10,7 @@ use unicode_segmentation::UnicodeSegmentation;
 
 fn main() {
     let s = "a̐éö̲\r\n";
-    let g = UnicodeSegmentation::graphemes(s, true).collect::<Vec<&str>>();
+    let g = s.graphemes(true).collect::<Vec<&str>>();
     let b: &[_] = &["a̐", "é", "ö̲", "\r\n"];
     assert_eq!(g, b);
 
