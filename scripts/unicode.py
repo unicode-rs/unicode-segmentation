@@ -280,7 +280,7 @@ def emit_break_module(f, break_table, break_cats, name):
         f.write(("        %sC_" % Name[0]) + cat + ",\n")
     f.write("""    }
 
-    fn bsearch_range_value_table(c: char, r: &'static [(char, char, %sCat)]) -> %sCat {
+    fn bsearch_range_value_table(c: char, r: &'static [(char, char, %sCat)]) -> (u32, u32, %sCat) {
         use core::cmp::Ordering::{Equal, Less, Greater};
         match r.binary_search_by(|&(lo, hi, _)| {
             if lo <= c && c <= hi { Equal }
@@ -288,14 +288,20 @@ def emit_break_module(f, break_table, break_cats, name):
             else { Greater }
         }) {
             Ok(idx) => {
-                let (_, _, cat) = r[idx];
-                cat
+                let (lower, upper, cat) = r[idx];
+                (lower as u32, upper as u32, cat)
             }
-            Err(_) => %sC_Any
+            Err(idx) => {
+                (
+                    if idx > 0 { r[idx-1].1 as u32 + 1 } else { 0 },
+                    r.get(idx).map(|c|c.0 as u32 - 1).unwrap_or(core::u32::MAX),
+                    %sC_Any,
+                )
+            }
         }
     }
 
-    pub fn %s_category(c: char) -> %sCat {
+    pub fn %s_category(c: char) -> (u32, u32, %sCat) {
         bsearch_range_value_table(c, %s_cat_table)
     }
 

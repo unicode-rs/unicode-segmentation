@@ -345,7 +345,7 @@ pub mod grapheme {
         GC_ZWJ,
     }
 
-    fn bsearch_range_value_table(c: char, r: &'static [(char, char, GraphemeCat)]) -> GraphemeCat {
+    fn bsearch_range_value_table(c: char, r: &'static [(char, char, GraphemeCat)]) -> (u32, u32, GraphemeCat) {
         use core::cmp::Ordering::{Equal, Less, Greater};
         match r.binary_search_by(|&(lo, hi, _)| {
             if lo <= c && c <= hi { Equal }
@@ -353,14 +353,20 @@ pub mod grapheme {
             else { Greater }
         }) {
             Ok(idx) => {
-                let (_, _, cat) = r[idx];
-                cat
+                let (lower, upper, cat) = r[idx];
+                (lower as u32, upper as u32, cat)
             }
-            Err(_) => GC_Any
+            Err(idx) => {
+                (
+                    if idx > 0 { r[idx-1].1 as u32 + 1 } else { 0 },
+                    r.get(idx).map(|c|c.0 as u32 - 1).unwrap_or(core::u32::MAX),
+                    GC_Any,
+                )
+            }
         }
     }
 
-    pub fn grapheme_category(c: char) -> GraphemeCat {
+    pub fn grapheme_category(c: char) -> (u32, u32, GraphemeCat) {
         bsearch_range_value_table(c, grapheme_cat_table)
     }
 
@@ -980,7 +986,7 @@ pub mod word {
         WC_ZWJ,
     }
 
-    fn bsearch_range_value_table(c: char, r: &'static [(char, char, WordCat)]) -> WordCat {
+    fn bsearch_range_value_table(c: char, r: &'static [(char, char, WordCat)]) -> (u32, u32, WordCat) {
         use core::cmp::Ordering::{Equal, Less, Greater};
         match r.binary_search_by(|&(lo, hi, _)| {
             if lo <= c && c <= hi { Equal }
@@ -988,14 +994,20 @@ pub mod word {
             else { Greater }
         }) {
             Ok(idx) => {
-                let (_, _, cat) = r[idx];
-                cat
+                let (lower, upper, cat) = r[idx];
+                (lower as u32, upper as u32, cat)
             }
-            Err(_) => WC_Any
+            Err(idx) => {
+                (
+                    if idx > 0 { r[idx-1].1 as u32 + 1 } else { 0 },
+                    r.get(idx).map(|c|c.0 as u32 - 1).unwrap_or(core::u32::MAX),
+                    WC_Any,
+                )
+            }
         }
     }
 
-    pub fn word_category(c: char) -> WordCat {
+    pub fn word_category(c: char) -> (u32, u32, WordCat) {
         bsearch_range_value_table(c, word_cat_table)
     }
 
@@ -1439,7 +1451,7 @@ pub mod emoji {
         EC_Extended_Pictographic,
     }
 
-    fn bsearch_range_value_table(c: char, r: &'static [(char, char, EmojiCat)]) -> EmojiCat {
+    fn bsearch_range_value_table(c: char, r: &'static [(char, char, EmojiCat)]) -> (u32, u32, EmojiCat) {
         use core::cmp::Ordering::{Equal, Less, Greater};
         match r.binary_search_by(|&(lo, hi, _)| {
             if lo <= c && c <= hi { Equal }
@@ -1447,14 +1459,20 @@ pub mod emoji {
             else { Greater }
         }) {
             Ok(idx) => {
-                let (_, _, cat) = r[idx];
-                cat
+                let (lower, upper, cat) = r[idx];
+                (lower as u32, upper as u32, cat)
             }
-            Err(_) => EC_Any
+            Err(idx) => {
+                (
+                    if idx > 0 { r[idx-1].1 as u32 + 1 } else { 0 },
+                    r.get(idx).map(|c|c.0 as u32 - 1).unwrap_or(core::u32::MAX),
+                    EC_Any,
+                )
+            }
         }
     }
 
-    pub fn emoji_category(c: char) -> EmojiCat {
+    pub fn emoji_category(c: char) -> (u32, u32, EmojiCat) {
         bsearch_range_value_table(c, emoji_cat_table)
     }
 
@@ -1535,7 +1553,7 @@ pub mod sentence {
         SC_Upper,
     }
 
-    fn bsearch_range_value_table(c: char, r: &'static [(char, char, SentenceCat)]) -> SentenceCat {
+    fn bsearch_range_value_table(c: char, r: &'static [(char, char, SentenceCat)]) -> (u32, u32, SentenceCat) {
         use core::cmp::Ordering::{Equal, Less, Greater};
         match r.binary_search_by(|&(lo, hi, _)| {
             if lo <= c && c <= hi { Equal }
@@ -1543,14 +1561,20 @@ pub mod sentence {
             else { Greater }
         }) {
             Ok(idx) => {
-                let (_, _, cat) = r[idx];
-                cat
+                let (lower, upper, cat) = r[idx];
+                (lower as u32, upper as u32, cat)
             }
-            Err(_) => SC_Any
+            Err(idx) => {
+                (
+                    if idx > 0 { r[idx-1].1 as u32 + 1 } else { 0 },
+                    r.get(idx).map(|c|c.0 as u32 - 1).unwrap_or(core::u32::MAX),
+                    SC_Any,
+                )
+            }
         }
     }
 
-    pub fn sentence_category(c: char) -> SentenceCat {
+    pub fn sentence_category(c: char) -> (u32, u32, SentenceCat) {
         bsearch_range_value_table(c, sentence_cat_table)
     }
 
