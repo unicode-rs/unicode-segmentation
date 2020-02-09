@@ -281,6 +281,7 @@ def emit_break_module(f, break_table, break_cats, name):
     f.write("""    }
 
     fn bsearch_range_value_table(c: char, r: &'static [(char, char, %sCat)]) -> (u32, u32, %sCat) {
+        use core;
         use core::cmp::Ordering::{Equal, Less, Greater};
         match r.binary_search_by(|&(lo, hi, _)| {
             if lo <= c && c <= hi { Equal }

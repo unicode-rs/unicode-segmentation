@@ -566,7 +566,6 @@ impl GraphemeCursor {
     /// assert_eq!(cursor.next_boundary(&s[2..4], 2), Ok(None));
     /// ```
     pub fn next_boundary(&mut self, chunk: &str, chunk_start: usize) -> Result<Option<usize>, GraphemeIncomplete> {
-        use tables::grapheme as gr;
         if self.offset == self.len {
             return Ok(None);
         }
@@ -642,7 +641,6 @@ impl GraphemeCursor {
     /// assert_eq!(cursor.prev_boundary(&s[0..2], 0), Ok(None));
     /// ```
     pub fn prev_boundary(&mut self, chunk: &str, chunk_start: usize) -> Result<Option<usize>, GraphemeIncomplete> {
-        use tables::grapheme as gr;
         if self.offset == 0 {
             return Ok(None);
         }
