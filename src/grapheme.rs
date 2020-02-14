@@ -293,9 +293,9 @@ impl GraphemeCursor {
             // ascii range.
             if ch >= '\u{20}' {
                 GC_Any
-            } else if ch == '\u{a}' {
+            } else if ch == '\n' {
                 GC_LF
-            } else if ch == '\u{d}' {
+            } else if ch == '\r' {
                 GC_CR
             } else {
                 GC_Control
