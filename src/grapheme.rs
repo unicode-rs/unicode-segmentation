@@ -284,12 +284,30 @@ impl GraphemeCursor {
 
     fn grapheme_category(&mut self, ch: char) -> GraphemeCat {
         use tables::grapheme as gr;
-        // If this char isn't within the cached range, update the cache to the
-        // range that includes it.
-        if (ch as u32) < self.grapheme_cat_cache.0 || (ch as u32) > self.grapheme_cat_cache.1 {
-            self.grapheme_cat_cache = gr::grapheme_category(ch);
+        use tables::grapheme::GraphemeCat::*;
+
+        if ch <= '\u{7e}' {
+            // Special-case optimization for ascii, except U+007F.  This
+            // improves performance even for many primarily non-ascii texts,
+            // due to use of punctuation and white space characters from the
+            // ascii range.
+            if ch >= '\u{20}' {
+                GC_Any
+            } else if ch == '\u{a}' {
+                GC_LF
+            } else if ch == '\u{d}' {
+                GC_CR
+            } else {
+                GC_Control
+            }
+        } else {
+            // If this char isn't within the cached range, update the cache to the
+            // range that includes it.
+            if (ch as u32) < self.grapheme_cat_cache.0 || (ch as u32) > self.grapheme_cat_cache.1 {
+                self.grapheme_cat_cache = gr::grapheme_category(ch);
+            }
+            self.grapheme_cat_cache.2
         }
-        self.grapheme_cat_cache.2
     }
 
     // Not sure I'm gonna keep this, the advantage over new() seems thin.
