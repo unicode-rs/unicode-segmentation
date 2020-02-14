@@ -4,94 +4,49 @@ extern crate unicode_segmentation;
 
 use bencher::Bencher;
 use unicode_segmentation::UnicodeSegmentation;
+use std::fs;
 
-const TEXT_ARABIC: &str = include_str!("texts/arabic.txt");
-const TEXT_ENGLISH: &str = include_str!("texts/english.txt");
-const TEXT_HINDI: &str = include_str!("texts/hindi.txt");
-const TEXT_JAPANESE: &str = include_str!("texts/japanese.txt");
-const TEXT_KOREAN: &str = include_str!("texts/korean.txt");
-const TEXT_MANDARIN: &str = include_str!("texts/mandarin.txt");
-const TEXT_RUSSIAN: &str = include_str!("texts/russian.txt");
-const TEXT_SOURCE_CODE: &str = include_str!("texts/source_code.txt");
-
-fn graphemes_arabic(bench: &mut Bencher) {
+fn graphemes(bench: &mut Bencher, path: &str) {
+    let text = fs::read_to_string(path).unwrap();
     bench.iter(|| {
-        for g in UnicodeSegmentation::graphemes(TEXT_ARABIC, true) {
+        for g in UnicodeSegmentation::graphemes(&*text, true) {
             bencher::black_box(g);
         }
     });
 
-    bench.bytes = TEXT_ARABIC.len() as u64;
+    bench.bytes = text.len() as u64;
+}
+
+fn graphemes_arabic(bench: &mut Bencher) {
+    graphemes(bench, "benches/texts/arabic.txt");
 }
 
 fn graphemes_english(bench: &mut Bencher) {
-    bench.iter(|| {
-        for g in UnicodeSegmentation::graphemes(TEXT_ENGLISH, true) {
-            bencher::black_box(g);
-        }
-    });
-
-    bench.bytes = TEXT_ENGLISH.len() as u64;
+    graphemes(bench, "benches/texts/english.txt");
 }
 
 fn graphemes_hindi(bench: &mut Bencher) {
-    bench.iter(|| {
-        for g in UnicodeSegmentation::graphemes(TEXT_HINDI, true) {
-            bencher::black_box(g);
-        }
-    });
-
-    bench.bytes = TEXT_HINDI.len() as u64;
+    graphemes(bench, "benches/texts/hindi.txt");
 }
 
 fn graphemes_japanese(bench: &mut Bencher) {
-    bench.iter(|| {
-        for g in UnicodeSegmentation::graphemes(TEXT_JAPANESE, true) {
-            bencher::black_box(g);
-        }
-    });
-
-    bench.bytes = TEXT_JAPANESE.len() as u64;
+    graphemes(bench, "benches/texts/japanese.txt");
 }
 
 fn graphemes_korean(bench: &mut Bencher) {
-    bench.iter(|| {
-        for g in UnicodeSegmentation::graphemes(TEXT_KOREAN, true) {
-            bencher::black_box(g);
-        }
-    });
-
-    bench.bytes = TEXT_KOREAN.len() as u64;
+    graphemes(bench, "benches/texts/korean.txt");
 }
 
 fn graphemes_mandarin(bench: &mut Bencher) {
-    bench.iter(|| {
-        for g in UnicodeSegmentation::graphemes(TEXT_MANDARIN, true) {
-            bencher::black_box(g);
-        }
-    });
-
-    bench.bytes = TEXT_MANDARIN.len() as u64;
+    graphemes(bench, "benches/texts/mandarin.txt");
 }
 
 fn graphemes_russian(bench: &mut Bencher) {
-    bench.iter(|| {
-        for g in UnicodeSegmentation::graphemes(TEXT_RUSSIAN, true) {
-            bencher::black_box(g);
-        }
-    });
-
-    bench.bytes = TEXT_RUSSIAN.len() as u64;
+    graphemes(bench, "benches/texts/russian.txt");
 }
 
 fn graphemes_source_code(bench: &mut Bencher) {
-    bench.iter(|| {
-        for g in UnicodeSegmentation::graphemes(TEXT_SOURCE_CODE, true) {
-            bencher::black_box(g);
-        }
-    });
-
-    bench.bytes = TEXT_SOURCE_CODE.len() as u64;
+    graphemes(bench, "benches/texts/source_code.txt");
 }
 
 benchmark_group!(
