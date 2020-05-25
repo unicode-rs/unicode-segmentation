@@ -13,6 +13,12 @@ use core::cmp;
 use tables::grapheme::GraphemeCat;
 
 /// External iterator for grapheme clusters and byte offsets.
+///
+/// This struct is created by the [`grapheme_indices`] method on the [`UnicodeSegmentation`]
+/// trait. See its documentation for more.
+///
+/// [`grapheme_indices`]: trait.UnicodeSegmentation.html#tymethod.grapheme_indices
+/// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
 #[derive(Clone)]
 pub struct GraphemeIndices<'a> {
     start_offset: usize,
@@ -61,6 +67,12 @@ impl<'a> DoubleEndedIterator for GraphemeIndices<'a> {
 
 /// External iterator for a string's
 /// [grapheme clusters](http://www.unicode.org/reports/tr29/#Grapheme_Cluster_Boundaries).
+///
+/// This struct is created by the [`graphemes`] method on the [`UnicodeSegmentation`] trait. See its
+/// documentation for more.
+///
+/// [`graphemes`]: trait.UnicodeSegmentation.html#tymethod.graphemes
+/// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
 #[derive(Clone)]
 pub struct Graphemes<'a> {
     string: &'a str,
