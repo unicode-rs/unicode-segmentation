@@ -274,6 +274,12 @@ mod fwd {
 /// [Alphabetic](http://unicode.org/reports/tr44/#Alphabetic)
 /// property, or with
 /// [General_Category=Number](http://unicode.org/reports/tr44/#General_Category_Values).
+///
+/// This struct is created by the [`unicode_sentences`] method on the [`UnicodeSegmentation`]
+/// trait. See its documentation for more.
+///
+/// [`unicode_sentences`]: trait.UnicodeSegmentation.html#tymethod.unicode_sentences
+/// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
 #[derive(Clone)]
 pub struct UnicodeSentences<'a> {
     inner: Filter<USentenceBounds<'a>, fn(&&str) -> bool>,
@@ -281,6 +287,12 @@ pub struct UnicodeSentences<'a> {
 
 /// External iterator for a string's
 /// [sentence boundaries](http://www.unicode.org/reports/tr29/#Sentence_Boundaries).
+///
+/// This struct is created by the [`split_sentence_bounds`] method on the [`UnicodeSegmentation`]
+/// trait. See its documentation for more.
+///
+/// [`split_sentence_bounds`]: trait.UnicodeSegmentation.html#tymethod.split_sentence_bounds
+/// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
 #[derive(Clone)]
 pub struct USentenceBounds<'a> {
     iter: fwd::SentenceBreaks<'a>,
@@ -288,6 +300,12 @@ pub struct USentenceBounds<'a> {
 }
 
 /// External iterator for sentence boundaries and byte offsets.
+///
+/// This struct is created by the [`split_sentence_bound_indices`] method on the
+/// [`UnicodeSegmentation`] trait. See its documentation for more.
+///
+/// [`split_sentence_bound_indices`]: trait.UnicodeSegmentation.html#tymethod.split_sentence_bound_indices
+/// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
 #[derive(Clone)]
 pub struct USentenceBoundIndices<'a> {
     start_offset: usize,

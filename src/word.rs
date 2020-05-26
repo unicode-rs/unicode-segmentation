@@ -19,6 +19,12 @@ use tables::word::WordCat;
 /// [Alphabetic](http://unicode.org/reports/tr44/#Alphabetic)
 /// property, or with
 /// [General_Category=Number](http://unicode.org/reports/tr44/#General_Category_Values).
+///
+/// This struct is created by the [`unicode_words`] method on the [`UnicodeSegmentation`] trait. See
+/// its documentation for more.
+///
+/// [`unicode_words`]: trait.UnicodeSegmentation.html#tymethod.unicode_words
+/// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
 pub struct UnicodeWords<'a> {
     inner: Filter<UWordBounds<'a>, fn(&&str) -> bool>,
 }
@@ -36,6 +42,12 @@ impl<'a> DoubleEndedIterator for UnicodeWords<'a> {
 
 /// External iterator for a string's
 /// [word boundaries](http://www.unicode.org/reports/tr29/#Word_Boundaries).
+///
+/// This struct is created by the [`split_word_bounds`] method on the [`UnicodeSegmentation`]
+/// trait. See its documentation for more.
+///
+/// [`split_word_bounds`]: trait.UnicodeSegmentation.html#tymethod.split_word_bounds
+/// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
 #[derive(Clone)]
 pub struct UWordBounds<'a> {
     string: &'a str,
@@ -44,6 +56,12 @@ pub struct UWordBounds<'a> {
 }
 
 /// External iterator for word boundaries and byte offsets.
+///
+/// This struct is created by the [`split_word_bound_indices`] method on the
+/// [`UnicodeSegmentation`] trait. See its documentation for more.
+///
+/// [`split_word_bound_indices`]: trait.UnicodeSegmentation.html#tymethod.split_word_bound_indices
+/// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
 #[derive(Clone)]
 pub struct UWordBoundIndices<'a> {
     start_offset: usize,
