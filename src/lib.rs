@@ -180,18 +180,18 @@ pub trait UnicodeSegmentation {
     /// Returns an iterator over substrings of `self` separated on
     /// [UAX#29 sentence boundaries](http://www.unicode.org/reports/tr29/#Sentence_Boundaries).
     ///
-    /// The concatenation of the substrings returned by this function is just the original string.
-    fn unicode_sentences<'a>(&'a self) -> UnicodeSentences<'a>;
-
-    /// Returns an iterator over substrings of `self` separated on
-    /// [UAX#29 sentence boundaries](http://www.unicode.org/reports/tr29/#Sentence_Boundaries).
-    ///
     /// Here, "sentences" are just those substrings which, after splitting on
     /// UAX#29 sentence boundaries, contain any alphanumeric characters. That is, the
     /// substring must contain at least one character with the
     /// [Alphabetic](http://unicode.org/reports/tr44/#Alphabetic)
     /// property, or with
     /// [General_Category=Number](http://unicode.org/reports/tr44/#General_Category_Values).
+    fn unicode_sentences<'a>(&'a self) -> UnicodeSentences<'a>;
+
+    /// Returns an iterator over substrings of `self` separated on
+    /// [UAX#29 sentence boundaries](http://www.unicode.org/reports/tr29/#Sentence_Boundaries).
+    ///
+    /// The concatenation of the substrings returned by this function is just the original string.
     fn split_sentence_bounds<'a>(&'a self) -> USentenceBounds<'a>;
 
     /// Returns an iterator over substrings of `self`, split on UAX#29 sentence boundaries,
