@@ -180,22 +180,56 @@ pub trait UnicodeSegmentation {
     /// Returns an iterator over substrings of `self` separated on
     /// [UAX#29 sentence boundaries](http://www.unicode.org/reports/tr29/#Sentence_Boundaries).
     ///
-    /// The concatenation of the substrings returned by this function is just the original string.
-    fn unicode_sentences<'a>(&'a self) -> UnicodeSentences<'a>;
-
-    /// Returns an iterator over substrings of `self` separated on
-    /// [UAX#29 sentence boundaries](http://www.unicode.org/reports/tr29/#Sentence_Boundaries).
-    ///
     /// Here, "sentences" are just those substrings which, after splitting on
     /// UAX#29 sentence boundaries, contain any alphanumeric characters. That is, the
     /// substring must contain at least one character with the
     /// [Alphabetic](http://unicode.org/reports/tr44/#Alphabetic)
     /// property, or with
     /// [General_Category=Number](http://unicode.org/reports/tr44/#General_Category_Values).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use self::unicode_segmentation::UnicodeSegmentation;
+    /// let uss = "Mr. Fox jumped. [...] The dog was too lazy.";
+    /// let us1 = uss.unicode_sentences().collect::<Vec<&str>>();
+    /// let b: &[_] = &["Mr. ", "Fox jumped. ", "The dog was too lazy."];
+    ///
+    /// assert_eq!(&us1[..], b);
+    /// ```
+    fn unicode_sentences<'a>(&'a self) -> UnicodeSentences<'a>;
+
+    /// Returns an iterator over substrings of `self` separated on
+    /// [UAX#29 sentence boundaries](http://www.unicode.org/reports/tr29/#Sentence_Boundaries).
+    ///
+    /// The concatenation of the substrings returned by this function is just the original string.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use self::unicode_segmentation::UnicodeSegmentation;
+    /// let ssbs = "Mr. Fox jumped. [...] The dog was too lazy.";
+    /// let ssb1 = ssbs.split_sentence_bounds().collect::<Vec<&str>>();
+    /// let b: &[_] = &["Mr. ", "Fox jumped. ", "[...] ", "The dog was too lazy."];
+    ///
+    /// assert_eq!(&ssb1[..], b);
+    /// ```
     fn split_sentence_bounds<'a>(&'a self) -> USentenceBounds<'a>;
 
     /// Returns an iterator over substrings of `self`, split on UAX#29 sentence boundaries,
     /// and their offsets. See `split_sentence_bounds()` for more information.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use self::unicode_segmentation::UnicodeSegmentation;
+    /// let ssis = "Mr. Fox jumped. [...] The dog was too lazy.";
+    /// let ssi1 = ssis.split_sentence_bound_indices().collect::<Vec<(usize, &str)>>();
+    /// let b: &[_] = &[(0, "Mr. "), (4, "Fox jumped. "), (16, "[...] "),
+    ///                 (22, "The dog was too lazy.")];
+    ///
+    /// assert_eq!(&ssi1[..], b);
+    /// ```
     fn split_sentence_bound_indices<'a>(&'a self) -> USentenceBoundIndices<'a>;
 }
 
