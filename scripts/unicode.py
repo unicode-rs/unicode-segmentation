@@ -64,10 +64,10 @@ def is_surrogate(n):
 def fetch(f):
     if not os.path.exists(os.path.basename(f)):
         if "emoji" in f:
-            os.system("curl -O http://www.unicode.org/Public/%s/ucd/emoji/%s"
+            os.system("curl -O https://www.unicode.org/Public/%s/ucd/emoji/%s"
                       % (UNICODE_VERSION_NUMBER, f))
         else:
-            os.system("curl -O http://www.unicode.org/Public/%s/ucd/%s"
+            os.system("curl -O https://www.unicode.org/Public/%s/ucd/%s"
                       % (UNICODE_VERSION_NUMBER, f))
 
     if not os.path.exists(os.path.basename(f)):
