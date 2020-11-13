@@ -54,7 +54,7 @@ expanded_categories = {
 # these are the surrogate codepoints, which are not valid rust characters
 surrogate_codepoints = (0xd800, 0xdfff)
 
-UNICODE_VERSION = (12, 0, 0)
+UNICODE_VERSION = (13, 0, 0)
 
 UNICODE_VERSION_NUMBER = "%s.%s.%s" %UNICODE_VERSION
 
@@ -64,10 +64,10 @@ def is_surrogate(n):
 def fetch(f):
     if not os.path.exists(os.path.basename(f)):
         if "emoji" in f:
-            os.system("curl -O https://www.unicode.org/Public/emoji/%s.%s/%s"
-                      % (UNICODE_VERSION[0], UNICODE_VERSION[1], f))
+            os.system("curl -O https://www.unicode.org/Public/%s/ucd/emoji/%s"
+                      % (UNICODE_VERSION_NUMBER, f))
         else:
-            os.system("curl -O http://www.unicode.org/Public/%s/ucd/%s"
+            os.system("curl -O https://www.unicode.org/Public/%s/ucd/%s"
                       % (UNICODE_VERSION_NUMBER, f))
 
     if not os.path.exists(os.path.basename(f)):
