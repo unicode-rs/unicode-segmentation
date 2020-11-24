@@ -38,10 +38,20 @@ to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-unicode-segmentation = "1.6.0"
+unicode-segmentation = "1.7.1"
 ```
 
 # Change Log
+
+## 1.7.1
+
+* Update docs on version number
+
+## 1.7.0
+
+* [#87](https://github.com/unicode-rs/unicode-segmentation/pull/87) Upgrade to Unicode 13
+* [#79](https://github.com/unicode-rs/unicode-segmentation/pull/79) Implement a special-case lookup for ascii grapheme categories
+* [#77](https://github.com/unicode-rs/unicode-segmentation/pull/77) Optimization for grapheme iteration
 
 ## 1.6.0
 
