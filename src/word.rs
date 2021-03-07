@@ -40,6 +40,34 @@ impl<'a> DoubleEndedIterator for UnicodeWords<'a> {
     fn next_back(&mut self) -> Option<&'a str> { self.inner.next_back() }
 }
 
+/// An iterator over the substrings of a string which, after splitting the string on
+/// [word boundaries](http://www.unicode.org/reports/tr29/#Word_Boundaries),
+/// contain any characters with the
+/// [Alphabetic](http://unicode.org/reports/tr44/#Alphabetic)
+/// property, or with
+/// [General_Category=Number](http://unicode.org/reports/tr44/#General_Category_Values).
+/// This iterator also provides the byte offsets for each substring.
+///
+/// This struct is created by the [`unicode_word_indices`] method on the [`UnicodeSegmentation`] trait. See
+/// its documentation for more.
+///
+/// [`unicode_word_indices`]: trait.UnicodeSegmentation.html#tymethod.unicode_word_indices
+/// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
+pub struct UnicodeWordIndices<'a> {
+    inner: Filter<UWordBoundIndices<'a>, fn(&(usize, &str)) -> bool>,
+}
+
+impl<'a> Iterator for UnicodeWordIndices<'a> {
+    type Item = (usize, &'a str);
+
+    #[inline]
+    fn next(&mut self) -> Option<(usize, &'a str)> { self.inner.next() }
+}
+impl<'a> DoubleEndedIterator for UnicodeWordIndices<'a> {
+    #[inline]
+    fn next_back(&mut self) -> Option<(usize, &'a str)> { self.inner.next_back() }
+}
+
 /// External iterator for a string's
 /// [word boundaries](http://www.unicode.org/reports/tr29/#Word_Boundaries).
 ///
@@ -671,12 +699,22 @@ pub fn new_word_bound_indices<'b>(s: &'b str) -> UWordBoundIndices<'b> {
 }
 
 #[inline]
-pub fn new_unicode_words<'b>(s: &'b str) -> UnicodeWords<'b> {
-    use super::UnicodeSegmentation;
+fn has_alphanumeric(s: &&str) -> bool {
     use tables::util::is_alphanumeric;
 
-    fn has_alphanumeric(s: &&str) -> bool { s.chars().any(|c| is_alphanumeric(c)) }
-    let has_alphanumeric: fn(&&str) -> bool = has_alphanumeric; // coerce to fn pointer
+    s.chars().any(|c| is_alphanumeric(c))
+}
+
+#[inline]
+pub fn new_unicode_words<'b>(s: &'b str) -> UnicodeWords<'b> {
+    use super::UnicodeSegmentation;
 
     UnicodeWords { inner: s.split_word_bounds().filter(has_alphanumeric) }
+}
+
+#[inline]
+pub fn new_unicode_word_indices<'b>(s: &'b str) -> UnicodeWordIndices<'b> {
+    use super::UnicodeSegmentation;
+
+    UnicodeWordIndices { inner: s.split_word_bound_indices().filter(|(_, c)| has_alphanumeric(c)) }
 }
