@@ -352,7 +352,6 @@ pub mod grapheme {
     }
 
     fn bsearch_range_value_table(c: char, r: &'static [(char, char, GraphemeCat)]) -> (u32, u32, GraphemeCat) {
-        use core;
         use core::cmp::Ordering::{Equal, Less, Greater};
         match r.binary_search_by(|&(lo, hi, _)| {
             if lo <= c && c <= hi { Equal }
@@ -1003,7 +1002,6 @@ pub mod word {
     }
 
     fn bsearch_range_value_table(c: char, r: &'static [(char, char, WordCat)]) -> (u32, u32, WordCat) {
-        use core;
         use core::cmp::Ordering::{Equal, Less, Greater};
         match r.binary_search_by(|&(lo, hi, _)| {
             if lo <= c && c <= hi { Equal }
@@ -1479,7 +1477,6 @@ pub mod emoji {
     }
 
     fn bsearch_range_value_table(c: char, r: &'static [(char, char, EmojiCat)]) -> (u32, u32, EmojiCat) {
-        use core;
         use core::cmp::Ordering::{Equal, Less, Greater};
         match r.binary_search_by(|&(lo, hi, _)| {
             if lo <= c && c <= hi { Equal }
@@ -1583,7 +1580,6 @@ pub mod sentence {
     }
 
     fn bsearch_range_value_table(c: char, r: &'static [(char, char, SentenceCat)]) -> (u32, u32, SentenceCat) {
-        use core;
         use core::cmp::Ordering::{Equal, Less, Greater};
         match r.binary_search_by(|&(lo, hi, _)| {
             if lo <= c && c <= hi { Equal }
