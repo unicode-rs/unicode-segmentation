@@ -30,7 +30,7 @@ pub mod util {
     #[inline]
     fn is_alphabetic(c: char) -> bool {
         match c {
-            'a' ... 'z' | 'A' ... 'Z' => true,
+            'a' ..= 'z' | 'A' ..= 'Z' => true,
             c if c > '' => super::derived_property::Alphabetic(c),
             _ => false,
         }
@@ -39,7 +39,7 @@ pub mod util {
     #[inline]
     fn is_numeric(c: char) -> bool {
         match c {
-            '0' ... '9' => true,
+            '0' ..= '9' => true,
             c if c > '' => super::general_category::N(c),
             _ => false,
         }
