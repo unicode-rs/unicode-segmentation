@@ -13,7 +13,7 @@ use core::iter::Filter;
 
 // All of the logic for forward iteration over sentences
 mod fwd {
-    use tables::sentence::SentenceCat;
+    use crate::tables::sentence::SentenceCat;
     use core::cmp;
 
     // Describe a parsed part of source string as described in this table:
@@ -111,7 +111,7 @@ mod fwd {
         if parts[idx] == StatePart::ClosePlus { idx -= 1 }
 
         if parts[idx] == StatePart::ATerm {
-            use tables::sentence as se;
+            use crate::tables::sentence as se;
 
             for next_char in ahead.chars() {
                 //( ¬(OLetter | Upper | Lower | ParaSep | SATerm) )* Lower
@@ -176,7 +176,7 @@ mod fwd {
 
         #[inline]
         fn next(&mut self) -> Option<usize> {
-            use tables::sentence as se;
+            use crate::tables::sentence as se;
 
             for next_char in self.string[self.pos..].chars() {
                 let position_before = self.pos;
@@ -331,7 +331,7 @@ pub fn new_sentence_bound_indices<'a>(source: &'a str) -> USentenceBoundIndices<
 #[inline]
 pub fn new_unicode_sentences<'b>(s: &'b str) -> UnicodeSentences<'b> {
     use super::UnicodeSegmentation;
-    use tables::util::is_alphanumeric;
+    use crate::tables::util::is_alphanumeric;
 
     fn has_alphanumeric(s: &&str) -> bool { s.chars().any(|c| is_alphanumeric(c)) }
     let has_alphanumeric: fn(&&str) -> bool = has_alphanumeric; // coerce to fn pointer

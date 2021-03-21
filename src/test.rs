@@ -14,7 +14,7 @@ use std::prelude::v1::*;
 
 #[test]
 fn test_graphemes() {
-    use testdata::{TEST_SAME, TEST_DIFF};
+    use crate::testdata::{TEST_SAME, TEST_DIFF};
 
     pub const EXTRA_DIFF: &'static [(&'static str,
                                      &'static [&'static str],
@@ -88,7 +88,7 @@ fn test_graphemes() {
 
 #[test]
 fn test_words() {
-    use testdata::TEST_WORD;
+    use crate::testdata::TEST_WORD;
 
     // Unicode's official tests don't really test longer chains of flag emoji
     // TODO This could be improved with more tests like flag emoji with interspersed Extend chars and ZWJ
@@ -144,7 +144,7 @@ fn test_words() {
 
 #[test]
 fn test_sentences() {
-    use testdata::TEST_SENTENCE;
+    use crate::testdata::TEST_SENTENCE;
 
     for &(s, w) in TEST_SENTENCE.iter() {
         macro_rules! assert_ {
