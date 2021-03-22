@@ -200,14 +200,13 @@ impl<'a> Iterator for UWordBounds<'a> {
         let mut cat = wd::WC_Any;
         let mut savecat = wd::WC_Any;
 
-        // Whether or not the previous category was ZWJ
-        // ZWJs get collapsed, so this handles precedence of WB3c over WB4
-        let mut prev_zwj;
         // If extend/format/zwj were skipped. Handles precedence of WB3d over WB4
         let mut skipped_format_extend = false;
         for (curr, ch) in self.string.char_indices() {
             idx = curr;
-            prev_zwj = cat == wd::WC_ZWJ;
+            // Whether or not the previous category was ZWJ
+            // ZWJs get collapsed, so this handles precedence of WB3c over WB4
+            let prev_zwj = cat == wd::WC_ZWJ;
             // if there's a category cached, grab it
             cat = match self.cat {
                 None => wd::word_category(ch).2,
