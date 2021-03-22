@@ -1,0 +1,24 @@
+
+[package]
+name = "unicode-segmentation-fuzz"
+version = "0.0.1"
+authors = ["Automatically generated"]
+
+[dependencies.unicode-segmentation]
+path = ".."
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "graphemes"
+path = "fuzzers/graphemes.rs"
+
+[[bin]]
+name = "words"
+path = "fuzzers/words.rs"
+
+[[bin]]
+name = "equality"
+path = "fuzzers/equality.rs"
