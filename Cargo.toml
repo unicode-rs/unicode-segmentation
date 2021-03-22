@@ -4,6 +4,7 @@ name = "unicode-segmentation"
 version = "1.7.1"
 authors = ["kwantam <kwantam@gmail.com>", "Manish Goregaokar <manishsmail@gmail.com>"]
 
+edition = "2018"
 homepage = "https://github.com/unicode-rs/unicode-segmentation"
 repository = "https://github.com/unicode-rs/unicode-segmentation"
 documentation = "https://unicode-rs.github.io/unicode-segmentation"

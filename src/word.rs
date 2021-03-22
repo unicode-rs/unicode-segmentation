@@ -11,7 +11,7 @@
 use core::cmp;
 use core::iter::Filter;
 
-use tables::word::WordCat;
+use crate::tables::word::WordCat;
 
 /// An iterator over the substrings of a string which, after splitting the string on
 /// [word boundaries](http://www.unicode.org/reports/tr29/#Word_Boundaries),
@@ -170,7 +170,7 @@ enum RegionalState {
 }
 
 fn is_emoji(ch: char) -> bool {
-    use tables::emoji;
+    use crate::tables::emoji;
     emoji::emoji_category(ch).2 == emoji::EmojiCat::EC_Extended_Pictographic
 }
 
@@ -187,7 +187,7 @@ impl<'a> Iterator for UWordBounds<'a> {
     fn next(&mut self) -> Option<&'a str> {
         use self::UWordBoundsState::*;
         use self::FormatExtendType::*;
-        use tables::word as wd;
+        use crate::tables::word as wd;
         if self.string.len() == 0 {
             return None;
         }
@@ -413,7 +413,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
     fn next_back(&mut self) -> Option<&'a str> {
         use self::UWordBoundsState::*;
         use self::FormatExtendType::*;
-        use tables::word as wd;
+        use crate::tables::word as wd;
         if self.string.len() == 0 {
             return None;
         }
@@ -665,7 +665,7 @@ impl<'a> UWordBounds<'a> {
 
     #[inline]
     fn get_next_cat(&self, idx: usize) -> Option<WordCat> {
-        use tables::word as wd;
+        use crate::tables::word as wd;
         let nidx = idx + self.string[idx..].chars().next().unwrap().len_utf8();
         if nidx < self.string.len() {
             let nch = self.string[nidx..].chars().next().unwrap();
@@ -677,7 +677,7 @@ impl<'a> UWordBounds<'a> {
 
     #[inline]
     fn get_prev_cat(&self, idx: usize) -> Option<WordCat> {
-        use tables::word as wd;
+        use crate::tables::word as wd;
         if idx > 0 {
             let nch = self.string[..idx].chars().next_back().unwrap();
             Some(wd::word_category(nch).2)
@@ -699,7 +699,7 @@ pub fn new_word_bound_indices<'b>(s: &'b str) -> UWordBoundIndices<'b> {
 
 #[inline]
 fn has_alphanumeric(s: &&str) -> bool {
-    use tables::util::is_alphanumeric;
+    use crate::tables::util::is_alphanumeric;
 
     s.chars().any(|c| is_alphanumeric(c))
 }
