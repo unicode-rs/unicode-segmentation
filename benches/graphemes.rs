@@ -7,7 +7,7 @@ use unicode_segmentation::UnicodeSegmentation;
 fn graphemes(c: &mut Criterion, lang: &str, path: &str) {
     let text = fs::read_to_string(path).unwrap();
 
-    c.bench_function(&format!("grapheme {}",lang), |bench| {
+    c.bench_function(&format!("graphemes_{}",lang), |bench| {
         bench.iter(|| {
             for g in UnicodeSegmentation::graphemes(black_box(&*text), true) {
                 black_box(g);
