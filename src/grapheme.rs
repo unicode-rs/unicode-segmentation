@@ -73,7 +73,7 @@ impl<'a> DoubleEndedIterator for GraphemeIndices<'a> {
 ///
 /// [`graphemes`]: trait.UnicodeSegmentation.html#tymethod.graphemes
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Graphemes<'a> {
     string: &'a str,
     cursor: GraphemeCursor,
@@ -148,7 +148,7 @@ pub fn new_grapheme_indices<'b>(s: &'b str, is_extended: bool) -> GraphemeIndice
 
 // maybe unify with PairResult?
 // An enum describing information about a potential boundary.
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 enum GraphemeState {
     // No information is known.
     Unknown,
@@ -165,7 +165,7 @@ enum GraphemeState {
 }
 
 /// Cursor-based segmenter for grapheme clusters.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct GraphemeCursor {
     // Current cursor position.
     offset: usize,
