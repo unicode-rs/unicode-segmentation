@@ -29,3 +29,11 @@ criterion = "0.3"
 [[bench]]
 name = "graphemes"
 harness = false
+
+[[bench]]
+name = "unicode_words"
+harness = false
+
+[[bench]]
+name = "word_bounds"
+harness = false
