@@ -228,6 +228,7 @@ enum PairResult {
     Emoji,  // a break if preceded by emoji base and (Extend)*
 }
 
+#[inline]
 fn check_pair(before: GraphemeCat, after: GraphemeCat) -> PairResult {
     use crate::tables::grapheme::GraphemeCat::*;
     use self::PairResult::*;
@@ -407,6 +408,7 @@ impl GraphemeCursor {
         }
     }
 
+    #[inline]
     fn decide(&mut self, is_break: bool) {
         self.state = if is_break {
             GraphemeState::Break
@@ -415,11 +417,13 @@ impl GraphemeCursor {
         };
     }
 
+    #[inline]
     fn decision(&mut self, is_break: bool) -> Result<bool, GraphemeIncomplete> {
         self.decide(is_break);
         Ok(is_break)
     }
 
+    #[inline]
     fn is_boundary_result(&self) -> Result<bool, GraphemeIncomplete> {
         if self.state == GraphemeState::Break {
             Ok(true)
@@ -432,6 +436,7 @@ impl GraphemeCursor {
         }
     }
 
+    #[inline]
     fn handle_regional(&mut self, chunk: &str, chunk_start: usize) {
         use crate::tables::grapheme as gr;
         let mut ris_count = self.ris_count.unwrap_or(0);
@@ -452,6 +457,7 @@ impl GraphemeCursor {
         self.state = GraphemeState::Regional;
     }
 
+    #[inline]
     fn handle_emoji(&mut self, chunk: &str, chunk_start: usize) {
         use crate::tables::grapheme as gr;
         let mut iter = chunk.chars().rev();
@@ -482,6 +488,7 @@ impl GraphemeCursor {
         self.state = GraphemeState::Emoji;
     }
 
+    #[inline]
     /// Determine whether the current cursor location is a grapheme cluster boundary.
     /// Only a part of the string need be supplied. If `chunk_start` is nonzero or
     /// the length of `chunk` is not equal to `len` on creation, then this method
@@ -563,6 +570,7 @@ impl GraphemeCursor {
         }
     }
 
+    #[inline]
     /// Find the next boundary after the current cursor position. Only a part of
     /// the string need be supplied. If the chunk is incomplete, then this
     /// method might return `GraphemeIncomplete::PreContext` or
