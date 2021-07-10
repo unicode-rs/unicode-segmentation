@@ -165,6 +165,9 @@ enum GraphemeState {
 }
 
 /// Cursor-based segmenter for grapheme clusters.
+///
+/// This allows working with ropes and other datastructures where the string is not contiguous or
+/// fully known at initialization time.
 #[derive(Clone, Debug)]
 pub struct GraphemeCursor {
     // Current cursor position.
