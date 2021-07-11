@@ -109,6 +109,44 @@ pub trait UnicodeSegmentation {
     /// ```
     fn graphemes<'a>(&'a self, is_extended: bool) -> Graphemes<'a>;
 
+    /// Returns an iterator over the [legacy grapheme clusters][graphemes] of `self`.
+    ///
+    /// [graphemes]: http://www.unicode.org/reports/tr29/#Grapheme_Cluster_Boundaries
+    ///
+    /// [UAX#29](http://www.unicode.org/reports/tr29/#Grapheme_Cluster_Boundaries)
+    /// recommends extended grapheme cluster boundaries for general processing.
+    #[inline]
+    fn legacy_graphemes<'a>(&'a self) -> Graphemes<'a> {
+        self.graphemes(false)
+    }
+
+    /// Returns an iterator over the [extended grapheme clusters][graphemes] of `self`.
+    ///
+    /// [graphemes]: http://www.unicode.org/reports/tr29/#Grapheme_Cluster_Boundaries
+    ///
+    /// [UAX#29](http://www.unicode.org/reports/tr29/#Grapheme_Cluster_Boundaries)
+    /// recommends extended grapheme cluster boundaries for general processing.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use self::unicode_segmentation::UnicodeSegmentation;
+    /// let gr1 = UnicodeSegmentation::extended_graphemes("a\u{310}e\u{301}o\u{308}\u{332}")
+    ///           .collect::<Vec<&str>>();
+    /// let b: &[_] = &["a\u{310}", "e\u{301}", "o\u{308}\u{332}"];
+    ///
+    /// assert_eq!(&gr1[..], b);
+    ///
+    /// let gr2 = UnicodeSegmentation::extended_graphemes("a\r\nb🇷🇺🇸🇹").collect::<Vec<&str>>();
+    /// let b: &[_] = &["a", "\r\n", "b", "🇷🇺", "🇸🇹"];
+    ///
+    /// assert_eq!(&gr2[..], b);
+    /// ```
+    #[inline]
+    fn extended_graphemes<'a>(&'a self) -> Graphemes<'a> {
+        self.graphemes(true)
+    }
+
     /// Returns an iterator over the grapheme clusters of `self` and their
     /// byte offsets. See `graphemes()` for more information.
     ///
@@ -123,6 +161,31 @@ pub trait UnicodeSegmentation {
     /// assert_eq!(&gr_inds[..], b);
     /// ```
     fn grapheme_indices<'a>(&'a self, is_extended: bool) -> GraphemeIndices<'a>;
+
+    /// Returns an iterator over the legacy grapheme clusters of `self` and their
+    /// byte offsets. See `legacy_graphemes()` for more information.
+    #[inline]
+    fn legacy_grapheme_indices<'a>(&'a self) -> GraphemeIndices<'a> {
+        self.grapheme_indices(false)
+    }
+
+    /// Returns an iterator over the grapheme clusters of `self` and their
+    /// byte offsets. See `graphemes()` for more information.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use self::unicode_segmentation::UnicodeSegmentation;
+    /// let gr_inds = UnicodeSegmentation::extended_grapheme_indices("a̐éö̲\r\n")
+    ///               .collect::<Vec<(usize, &str)>>();
+    /// let b: &[_] = &[(0, "a̐"), (3, "é"), (6, "ö̲"), (11, "\r\n")];
+    ///
+    /// assert_eq!(&gr_inds[..], b);
+    /// ```
+    #[inline]
+    fn extended_grapheme_indices<'a>(&'a self) -> GraphemeIndices<'a> {
+        self.grapheme_indices(true)
+    }
 
     /// Returns an iterator over the words of `self`, separated on
     /// [UAX#29 word boundaries](http://www.unicode.org/reports/tr29/#Word_Boundaries).
