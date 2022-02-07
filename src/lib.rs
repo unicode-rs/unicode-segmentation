@@ -70,6 +70,7 @@ pub use word::{UWordBounds, UWordBoundIndices, UnicodeWords, UnicodeWordIndices}
 pub use sentence::{USentenceBounds, USentenceBoundIndices, UnicodeSentences};
 
 mod grapheme;
+#[rustfmt::skip]
 mod tables;
 mod word;
 mod sentence;
