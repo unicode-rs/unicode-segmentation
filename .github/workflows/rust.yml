@@ -20,3 +20,5 @@ jobs:
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
+    - name: Verify regenerated files
+      run: ./scripts/unicode.py && diff tables.rs src/tables.rs
