@@ -1,55 +1,52 @@
-#[macro_use]
-extern crate bencher;
-extern crate unicode_segmentation;
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-use bencher::Bencher;
 use std::fs;
 use unicode_segmentation::UnicodeSegmentation;
 
-fn unicode_words(bench: &mut Bencher, path: &str) {
+fn unicode_words(c: &mut Criterion, lang: &str, path: &str) {
     let text = fs::read_to_string(path).unwrap();
-    bench.iter(|| {
-        for w in text.unicode_words() {
-            bencher::black_box(w);
-        }
+    c.bench_function(&format!("unicode_words_{}", lang), |bench| {
+        bench.iter(|| {
+            for w in text.unicode_words() {
+                black_box(w);
+            }
+        })
     });
-
-    bench.bytes = text.len() as u64;
 }
 
-fn unicode_words_arabic(bench: &mut Bencher) {
-    unicode_words(bench, "benches/texts/arabic.txt");
+fn unicode_words_arabic(c: &mut Criterion) {
+    unicode_words(c, "arabic", "benches/texts/arabic.txt");
 }
 
-fn unicode_words_english(bench: &mut Bencher) {
-    unicode_words(bench, "benches/texts/english.txt");
+fn unicode_words_english(c: &mut Criterion) {
+    unicode_words(c, "english", "benches/texts/english.txt");
 }
 
-fn unicode_words_hindi(bench: &mut Bencher) {
-    unicode_words(bench, "benches/texts/hindi.txt");
+fn unicode_words_hindi(c: &mut Criterion) {
+    unicode_words(c, "hindi", "benches/texts/hindi.txt");
 }
 
-fn unicode_words_japanese(bench: &mut Bencher) {
-    unicode_words(bench, "benches/texts/japanese.txt");
+fn unicode_words_japanese(c: &mut Criterion) {
+    unicode_words(c, "japanese", "benches/texts/japanese.txt");
 }
 
-fn unicode_words_korean(bench: &mut Bencher) {
-    unicode_words(bench, "benches/texts/korean.txt");
+fn unicode_words_korean(c: &mut Criterion) {
+    unicode_words(c, "korean", "benches/texts/korean.txt");
 }
 
-fn unicode_words_mandarin(bench: &mut Bencher) {
-    unicode_words(bench, "benches/texts/mandarin.txt");
+fn unicode_words_mandarin(c: &mut Criterion) {
+    unicode_words(c, "mandarin", "benches/texts/mandarin.txt");
 }
 
-fn unicode_words_russian(bench: &mut Bencher) {
-    unicode_words(bench, "benches/texts/russian.txt");
+fn unicode_words_russian(c: &mut Criterion) {
+    unicode_words(c, "russian", "benches/texts/russian.txt");
 }
 
-fn unicode_words_source_code(bench: &mut Bencher) {
-    unicode_words(bench, "benches/texts/source_code.txt");
+fn unicode_words_source_code(c: &mut Criterion) {
+    unicode_words(c, "source_code", "benches/texts/source_code.txt");
 }
 
-benchmark_group!(
+criterion_group!(
     benches,
     unicode_words_arabic,
     unicode_words_english,
@@ -61,4 +58,4 @@ benchmark_group!(
     unicode_words_source_code,
 );
 
-benchmark_main!(benches);
+criterion_main!(benches);
