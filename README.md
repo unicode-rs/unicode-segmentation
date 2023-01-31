@@ -38,7 +38,7 @@ to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-unicode-segmentation = "1.10.0"
+unicode-segmentation = "1.10.1"
 ```
 
 # Change Log
