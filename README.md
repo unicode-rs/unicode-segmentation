@@ -21,7 +21,7 @@ fn main() {
 
     let s = "The quick (\"brown\")  fox";
     let w = s.split_word_bounds().collect::<Vec<&str>>();
-    let b: &[_] = &["The", " ", "quick", " ", "(", "\"", "brown", "\"", ")", " ", " ", "fox"];
+    let b: &[_] = &["The", " ", "quick", " ", "(", "\"", "brown", "\"", ")", "  ", "fox"];
     assert_eq!(w, b);
 }
 ```
