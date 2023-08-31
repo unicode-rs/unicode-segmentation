@@ -17,7 +17,7 @@ This crate provides Grapheme Cluster, Word and Sentence boundaries
 according to Unicode Standard Annex #29 rules.
 """
 
-exclude = [ "target/*", "Cargo.lock", "scripts/tmp", "benches/texts/*", "*.txt", ]
+exclude = ["/.github", "/scripts", "/benches/texts"]
 
 [features]
 no_std = [] # This is a no-op, preserved for backward compatibility only.
