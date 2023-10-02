@@ -54,7 +54,6 @@ unicode-segmentation = "1.10.1"
 ## 1.9.0
 * [#101](https://github.com/unicode-rs/unicode-segmentation/pull/101) Upgrade to Unicode 14.0.0
 
-
 ## 1.7.0
 
 * [#87](https://github.com/unicode-rs/unicode-segmentation/pull/87) Upgrade to Unicode 13
