@@ -54,12 +54,6 @@ unicode-segmentation = "1.10.1"
 ## 1.9.0
 * [#101](https://github.com/unicode-rs/unicode-segmentation/pull/101) Upgrade to Unicode 14.0.0
 
-## 1.7.0
-
-* [#87](https://github.com/unicode-rs/unicode-segmentation/pull/87) Upgrade to Unicode 13
-* [#79](https://github.com/unicode-rs/unicode-segmentation/pull/79) Implement a special-case lookup for ascii grapheme categories
-* [#77](https://github.com/unicode-rs/unicode-segmentation/pull/77) Optimization for grapheme iteration
-
 ## 1.7.1
 
 * Update docs on version number
