@@ -43,6 +43,24 @@ unicode-segmentation = "1.10.1"
 
 # Change Log
 
+## 1.10.1
+* [#113](https://github.com/unicode-rs/unicode-segmentation/pull/113) Use criterion.rs for word benchmarks
+* [#112](https://github.com/unicode-rs/unicode-segmentation/pull/112) Improve table search speed through lookups
+
+## 1.10.0
+* [#107](https://github.com/unicode-rs/unicode-segmentation/pull/107) Upgrade to Unicode 15.0.0
+* [#104](https://github.com/unicode-rs/unicode-segmentation/pull/104) Supersedes and fixes [#75](https://github.com/unicode-rs/unicode-segmentation/pull/75)
+
+## 1.9.0
+* [#101](https://github.com/unicode-rs/unicode-segmentation/pull/101) Upgrade to Unicode 14.0.0
+
+
+## 1.7.0
+
+* [#87](https://github.com/unicode-rs/unicode-segmentation/pull/87) Upgrade to Unicode 13
+* [#79](https://github.com/unicode-rs/unicode-segmentation/pull/79) Implement a special-case lookup for ascii grapheme categories
+* [#77](https://github.com/unicode-rs/unicode-segmentation/pull/77) Optimization for grapheme iteration
+
 ## 1.7.1
 
 * Update docs on version number
