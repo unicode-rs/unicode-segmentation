@@ -50,6 +50,17 @@ unicode-segmentation = "1.10.1"
 * [#91](https://github.com/unicode-rs/unicode-segmentation/pull/92) Made local variable immutable by moving it into loop
 * [#91](https://github.com/unicode-rs/unicode-segmentation/pull/91) Add new iterator [UnicodeWordIndices](https://unicode-rs.github.io/unicode-segmentation/unicode_segmentation/struct.UnicodeWordIndices.html) and [unicode_word_indices](https://unicode-rs.github.io/unicode-segmentation/unicode_segmentation/trait.UnicodeSegmentation.html#tymethod.unicode_word_indices)
 
+## 1.10.1
+* [#113](https://github.com/unicode-rs/unicode-segmentation/pull/113) Use criterion.rs for word benchmarks
+* [#112](https://github.com/unicode-rs/unicode-segmentation/pull/112) Improve table search speed through lookups
+
+## 1.10.0
+* [#107](https://github.com/unicode-rs/unicode-segmentation/pull/107) Upgrade to Unicode 15.0.0
+* [#104](https://github.com/unicode-rs/unicode-segmentation/pull/104) Supersedes and fixes [#75](https://github.com/unicode-rs/unicode-segmentation/pull/75)
+
+## 1.9.0
+* [#101](https://github.com/unicode-rs/unicode-segmentation/pull/101) Upgrade to Unicode 14.0.0
+
 ## 1.7.1
 
 * Update docs on version number
