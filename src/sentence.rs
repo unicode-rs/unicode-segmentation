@@ -366,6 +366,11 @@ impl<'a> Iterator for UnicodeSentences<'a> {
     fn next(&mut self) -> Option<&'a str> {
         self.inner.next()
     }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.inner.size_hint()
+    }
 }
 
 impl<'a> Iterator for USentenceBounds<'a> {
