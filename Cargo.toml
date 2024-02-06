@@ -7,7 +7,6 @@ authors = ["kwantam <kwantam@gmail.com>", "Manish Goregaokar <manishsmail@gmail.
 edition = "2018"
 homepage = "https://github.com/unicode-rs/unicode-segmentation"
 repository = "https://github.com/unicode-rs/unicode-segmentation"
-documentation = "https://unicode-rs.github.io/unicode-segmentation"
 
 license = "MIT/Apache-2.0"
 keywords = ["text", "unicode", "grapheme", "word", "boundary"]
