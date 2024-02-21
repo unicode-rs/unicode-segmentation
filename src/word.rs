@@ -25,6 +25,7 @@ use crate::tables::word::WordCat;
 ///
 /// [`unicode_words`]: trait.UnicodeSegmentation.html#tymethod.unicode_words
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
+#[derive(Debug)]
 pub struct UnicodeWords<'a> {
     inner: Filter<UWordBounds<'a>, fn(&&str) -> bool>,
 }
@@ -62,6 +63,7 @@ impl<'a> DoubleEndedIterator for UnicodeWords<'a> {
 ///
 /// [`unicode_word_indices`]: trait.UnicodeSegmentation.html#tymethod.unicode_word_indices
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
+#[derive(Debug)]
 pub struct UnicodeWordIndices<'a> {
     inner: Filter<UWordBoundIndices<'a>, fn(&(usize, &str)) -> bool>,
 }
@@ -94,7 +96,7 @@ impl<'a> DoubleEndedIterator for UnicodeWordIndices<'a> {
 ///
 /// [`split_word_bounds`]: trait.UnicodeSegmentation.html#tymethod.split_word_bounds
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct UWordBounds<'a> {
     string: &'a str,
     cat: Option<WordCat>,
@@ -108,7 +110,7 @@ pub struct UWordBounds<'a> {
 ///
 /// [`split_word_bound_indices`]: trait.UnicodeSegmentation.html#tymethod.split_word_bound_indices
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct UWordBoundIndices<'a> {
     start_offset: usize,
     iter: UWordBounds<'a>,

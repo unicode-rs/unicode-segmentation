@@ -19,7 +19,7 @@ use crate::tables::grapheme::GraphemeCat;
 ///
 /// [`grapheme_indices`]: trait.UnicodeSegmentation.html#tymethod.grapheme_indices
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct GraphemeIndices<'a> {
     start_offset: usize,
     iter: Graphemes<'a>,
