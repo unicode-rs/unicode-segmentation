@@ -18,7 +18,7 @@ mod fwd {
 
     // Describe a parsed part of source string as described in this table:
     // https://unicode.org/reports/tr29/#Default_Sentence_Boundaries
-    #[derive(Clone, Copy, PartialEq, Eq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     enum StatePart {
         Sot,
         Eot,
@@ -33,7 +33,7 @@ mod fwd {
         STerm,
     }
 
-    #[derive(Clone, PartialEq, Eq)]
+    #[derive(Debug, Clone, PartialEq, Eq)]
     struct SentenceBreaksState(pub [StatePart; 4]);
 
     const INITIAL_STATE: SentenceBreaksState = SentenceBreaksState([
@@ -43,7 +43,7 @@ mod fwd {
         StatePart::Sot,
     ]);
 
-    #[derive(Clone)]
+    #[derive(Debug, Clone)]
     pub struct SentenceBreaks<'a> {
         pub string: &'a str,
         pos: usize,
@@ -296,7 +296,7 @@ mod fwd {
 ///
 /// [`unicode_sentences`]: trait.UnicodeSegmentation.html#tymethod.unicode_sentences
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct UnicodeSentences<'a> {
     inner: Filter<USentenceBounds<'a>, fn(&&str) -> bool>,
 }
@@ -309,7 +309,7 @@ pub struct UnicodeSentences<'a> {
 ///
 /// [`split_sentence_bounds`]: trait.UnicodeSegmentation.html#tymethod.split_sentence_bounds
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct USentenceBounds<'a> {
     iter: fwd::SentenceBreaks<'a>,
     sentence_start: Option<usize>,
@@ -322,7 +322,7 @@ pub struct USentenceBounds<'a> {
 ///
 /// [`split_sentence_bound_indices`]: trait.UnicodeSegmentation.html#tymethod.split_sentence_bound_indices
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct USentenceBoundIndices<'a> {
     start_offset: usize,
     iter: USentenceBounds<'a>,
