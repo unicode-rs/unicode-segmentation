@@ -1,61 +1,37 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 
 use std::fs;
 use unicode_segmentation::UnicodeSegmentation;
 
-fn word_bounds(c: &mut Criterion, lang: &str, path: &str) {
-    let text = fs::read_to_string(path).unwrap();
-    c.bench_function(&format!("word_bounds_{}", lang), |bench| {
-        bench.iter(|| {
-            for w in text.split_word_bounds() {
-                black_box(w);
-            }
-        });
-    });
+const FILES: &[&str] = &[
+    "arabic",
+    "english",
+    "hindi",
+    "japanese",
+    "korean",
+    "mandarin",
+    "russian",
+    "source_code",
+];
+
+#[inline(always)]
+fn grapheme(text: &str) {
+    for w in text.split_word_bounds() {
+        black_box(w);
+    }
 }
 
-fn word_bounds_arabic(c: &mut Criterion) {
-    word_bounds(c, "arabic", "benches/texts/arabic.txt");
+fn bench_all(c: &mut Criterion) {
+    let mut group = c.benchmark_group("word_bounds");
+
+    for file in FILES {
+        group.bench_with_input(
+            BenchmarkId::new("grapheme", file),
+            &fs::read_to_string(format!("benches/texts/{}.txt", file)).unwrap(),
+            |b, content| b.iter(|| grapheme(content)),
+        );
+    }
 }
 
-fn word_bounds_english(c: &mut Criterion) {
-    word_bounds(c, "english", "benches/texts/english.txt");
-}
-
-fn word_bounds_hindi(c: &mut Criterion) {
-    word_bounds(c, "hindi", "benches/texts/hindi.txt");
-}
-
-fn word_bounds_japanese(c: &mut Criterion) {
-    word_bounds(c, "japanese", "benches/texts/japanese.txt");
-}
-
-fn word_bounds_korean(c: &mut Criterion) {
-    word_bounds(c, "korean", "benches/texts/korean.txt");
-}
-
-fn word_bounds_mandarin(c: &mut Criterion) {
-    word_bounds(c, "mandarin", "benches/texts/mandarin.txt");
-}
-
-fn word_bounds_russian(c: &mut Criterion) {
-    word_bounds(c, "russian", "benches/texts/russian.txt");
-}
-
-fn word_bounds_source_code(c: &mut Criterion) {
-    word_bounds(c, "source_code", "benches/texts/source_code.txt");
-}
-
-criterion_group!(
-    benches,
-    word_bounds_arabic,
-    word_bounds_english,
-    word_bounds_hindi,
-    word_bounds_japanese,
-    word_bounds_korean,
-    word_bounds_mandarin,
-    word_bounds_russian,
-    word_bounds_source_code,
-);
-
+criterion_group!(benches, bench_all);
 criterion_main!(benches);

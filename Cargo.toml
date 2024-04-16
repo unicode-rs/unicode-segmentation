@@ -23,17 +23,16 @@ no_std = [] # This is a no-op, preserved for backward compatibility only.
 
 [dev-dependencies]
 quickcheck = "0.7"
-criterion = "0.3"
+criterion = "0.5"
 
 [[bench]]
-name = "graphemes"
+name = "chars"
 harness = false
 
 [[bench]]
-name = "unicode_words"
+name = "words"
 harness = false
 
 [[bench]]
 name = "word_bounds"
 harness = false
-
