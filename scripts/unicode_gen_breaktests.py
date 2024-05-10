@@ -140,8 +140,8 @@ def showfun(x):
     return outstr
 
 def create_grapheme_data(f):
-    # rules 9.1 and 9.2 are for extended graphemes only
-    optsplits = ['9.1','9.2']
+    # rules 9.1, 9.2, and 9.3 are for extended graphemes only
+    optsplits = ['9.1', '9.2', '9.3']
     d = load_test_data("auxiliary/GraphemeBreakTest.txt", optsplits)
 
     test_same = []

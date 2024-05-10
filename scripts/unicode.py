@@ -155,11 +155,11 @@ def format_table_content(f, content, indent):
             line = " "*indent + chunk
     f.write(line)
 
-def load_properties(f, interestingprops):
+def load_properties(f, interestingprops: "list[str | tuple[str, str]] | None" = None):
     fetch(f)
     props = {}
-    re1 = re.compile(r"^ *([0-9A-F]+) *; *(\w+)")
-    re2 = re.compile(r"^ *([0-9A-F]+)\.\.([0-9A-F]+) *; *(\w+)")
+    re1 = re.compile(r"^\s*([0-9A-F]+)\s*;\s*(\w+)(?:\s*;\s*(\w+))?")
+    re2 = re.compile(r"^\s*([0-9A-F]+)\.\.([0-9A-F]+)\s*;\s*(\w+)(?:\s*;\s*(\w+))?")
 
     for line in fileinput.input(os.path.basename(f)):
         prop = None
@@ -168,17 +168,21 @@ def load_properties(f, interestingprops):
         m = re1.match(line)
         if m:
             d_lo = m.group(1)
-            d_hi = m.group(1)
+            d_hi = d_lo
             prop = m.group(2)
+            value = m.group(3)
         else:
             m = re2.match(line)
             if m:
                 d_lo = m.group(1)
                 d_hi = m.group(2)
                 prop = m.group(3)
+                value = m.group(4)
             else:
                 continue
-        if interestingprops and prop not in interestingprops:
+        if value is not None:
+            prop = (prop, value)
+        if interestingprops is not None and prop not in interestingprops:
             continue
         d_lo = int(d_lo, 16)
         d_hi = int(d_hi, 16)
@@ -195,7 +199,7 @@ def load_properties(f, interestingprops):
 def escape_char(c):
     return "'\\u{%x}'" % c
 
-def emit_table(f, name, t_data, t_type = "&'static [(char, char)]", is_pub=True,
+def emit_table(f, name, t_data, t_type = "&[(char, char)]", is_pub=True,
         pfun=lambda x: "(%s,%s)" % (escape_char(x[0]), escape_char(x[1])), is_const=True):
     pub_string = "const"
     if not is_const:
@@ -217,7 +221,7 @@ def emit_util_mod(f):
     f.write("""
 pub mod util {
     #[inline]
-    pub fn bsearch_range_table(c: char, r: &'static [(char,char)]) -> bool {
+    pub fn bsearch_range_table(c: char, r: &[(char,char)]) -> bool {
         use core::cmp::Ordering::{Equal, Less, Greater};
         r.binary_search_by(|&(lo,hi)| {
             if lo <= c && c <= hi { Equal }
@@ -252,13 +256,22 @@ pub mod util {
 
 """)
 
-def emit_property_module(f, mod, tbl, emit):
-    f.write("mod %s {\n" % mod)
-    for cat in sorted(emit):
-        emit_table(f, "%s_table" % cat, tbl[cat], is_pub=False)
+def emit_property_module(f, mod, tbl, emit: "list[str | tuple[str, str]]"):
+    f.write("pub mod %s {\n" % mod)
+
+    cats = []
+    for cat in emit:
+        if type(cat) is tuple:
+            cats.append((f"{cat[0]}_{cat[1]}", cat))
+        else:
+            cats.append((cat, cat))
+    cats.sort(key=lambda x: x[0])
+
+    for cat_str, cat in cats:
+        emit_table(f, "%s_table" % cat_str, tbl[cat], is_pub=False)
         f.write("    #[inline]\n")
-        f.write("    pub fn %s(c: char) -> bool {\n" % cat)
-        f.write("        super::util::bsearch_range_table(c, %s_table)\n" % cat)
+        f.write("    pub fn %s(c: char) -> bool {\n" % cat_str)
+        f.write("        super::util::bsearch_range_table(c, %s_table)\n" % cat_str)
         f.write("    }\n\n")
     f.write("}\n\n")
 
@@ -303,7 +316,7 @@ def emit_break_module(f, break_table, break_cats, name):
         f.write(("        %sC_" % Name[0]) + cat + ",\n")
     f.write("""    }
 
-    fn bsearch_range_value_table(c: char, r: &'static [(char, char, %sCat)], default_lower: u32, default_upper: u32) -> (u32, u32, %sCat) {
+    fn bsearch_range_value_table(c: char, r: &[(char, char, %sCat)], default_lower: u32, default_upper: u32) -> (u32, u32, %sCat) {
         use core::cmp::Ordering::{Equal, Less, Greater};
         match r.binary_search_by(|&(lo, hi, _)| {
             if lo <= c && c <= hi { Equal }
@@ -355,11 +368,11 @@ def emit_break_module(f, break_table, break_cats, name):
     else:
       lookup_type = "u32"
 
-    emit_table(f, "%s_cat_lookup" % name, lookup_table, "&'static [%s]" % lookup_type,
+    emit_table(f, "%s_cat_lookup" % name, lookup_table, "&[%s]" % lookup_type,
         pfun=lambda x: "%d" % x,
         is_pub=False, is_const=True)
 
-    emit_table(f, "%s_cat_table" % name, break_table, "&'static [(char, char, %sCat)]" % Name,
+    emit_table(f, "%s_cat_table" % name, break_table, "&[(char, char, %sCat)]" % Name,
         pfun=lambda x: "(%s,%s,%sC_%s)" % (escape_char(x[0]), escape_char(x[1]), Name[0], x[2]),
         is_pub=False, is_const=True)
     f.write("}\n")
@@ -379,17 +392,26 @@ pub const UNICODE_VERSION: (u64, u64, u64) = (%s, %s, %s);
 
         # download and parse all the data
         gencats = load_gencats("UnicodeData.txt")
-        derived = load_properties("DerivedCoreProperties.txt", ["Alphabetic"])
+        derived = load_properties("DerivedCoreProperties.txt", ["Alphabetic", ("InCB", "Consonant"), ("InCB", "Extend"), ("InCB", "Linker")])
 
         emit_util_mod(rf)
         for (name, cat, pfuns) in ("general_category", gencats, ["N"]), \
-                                  ("derived_property", derived, ["Alphabetic"]):
+                                  ("derived_property", derived, ["Alphabetic", ("InCB", "Extend")]):
             emit_property_module(rf, name, cat, pfuns)
+
+        rf.write("""pub fn is_incb_linker(c: char) -> bool {
+    matches!(c,""")
+
+        for (lo, hi) in derived[("InCB", "Linker")]:
+            rf.write(f" | '\\u{{{lo:X}}}'")
+            if lo != hi:
+                rf.write(f"..'\\u{{{lo:X}}}'")
+        
+        rf.write(")\n}\n\n")
 
         ### grapheme cluster module
         # from http://www.unicode.org/reports/tr29/#Grapheme_Cluster_Break_Property_Values
-        grapheme_cats = load_properties("auxiliary/GraphemeBreakProperty.txt", [])
-
+        grapheme_cats = load_properties("auxiliary/GraphemeBreakProperty.txt")
         # Control
         #  Note:
         # This category also includes Cs (surrogate codepoints), but Rust's `char`s are
@@ -398,22 +420,22 @@ pub const UNICODE_VERSION: (u64, u64, u64) = (%s, %s, %s);
         grapheme_cats["Control"] = group_cat(list(
             set(ungroup_cat(grapheme_cats["Control"]))
             - set(ungroup_cat([surrogate_codepoints]))))
-
+        grapheme_cats["InCB_Consonant"] = derived[("InCB", "Consonant")]
+        emoji_props = load_properties("emoji-data.txt", ["Extended_Pictographic"])
+        grapheme_cats["Extended_Pictographic"] = emoji_props["Extended_Pictographic"]
         grapheme_table = []
         for cat in grapheme_cats:
             grapheme_table.extend([(x, y, cat) for (x, y) in grapheme_cats[cat]])
-        emoji_props = load_properties("emoji-data.txt", ["Extended_Pictographic"])
-        grapheme_table.extend([(x, y, "Extended_Pictographic") for (x, y) in emoji_props["Extended_Pictographic"]])
         grapheme_table.sort(key=lambda w: w[0])
         last = -1
         for chars in grapheme_table:
             if chars[0] <= last:
                 raise "Grapheme tables and Extended_Pictographic values overlap; need to store these separately!"
             last = chars[1]
-        emit_break_module(rf, grapheme_table, list(grapheme_cats.keys()) + ["Extended_Pictographic"], "grapheme")
+        emit_break_module(rf, grapheme_table, list(grapheme_cats.keys()), "grapheme")
         rf.write("\n")
 
-        word_cats = load_properties("auxiliary/WordBreakProperty.txt", [])
+        word_cats = load_properties("auxiliary/WordBreakProperty.txt")
         word_table = []
         for cat in word_cats:
             word_table.extend([(x, y, cat) for (x, y) in word_cats[cat]])
@@ -425,7 +447,7 @@ pub const UNICODE_VERSION: (u64, u64, u64) = (%s, %s, %s);
         emoji_table = [(x, y, "Extended_Pictographic") for (x, y) in emoji_props["Extended_Pictographic"]]
         emit_break_module(rf, emoji_table, ["Extended_Pictographic"], "emoji")
 
-        sentence_cats = load_properties("auxiliary/SentenceBreakProperty.txt", [])
+        sentence_cats = load_properties("auxiliary/SentenceBreakProperty.txt")
         sentence_table = []
         for cat in sentence_cats:
             sentence_table.extend([(x, y, cat) for (x, y) in sentence_cats[cat]])

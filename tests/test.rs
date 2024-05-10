@@ -48,12 +48,11 @@ fn test_graphemes() {
     ];
 
     for &(s, g) in TEST_SAME.iter().chain(EXTRA_SAME) {
-        if s.starts_with("क\u{94d}") || s.starts_with("क\u{93c}") {
-            continue; // TODO: fix these
-        }
         // test forward iterator
-        assert!(UnicodeSegmentation::graphemes(s, true).eq(g.iter().cloned()));
-        assert!(UnicodeSegmentation::graphemes(s, false).eq(g.iter().cloned()));
+        let our_extended: Vec<_> = UnicodeSegmentation::graphemes(s, true).collect();
+        let our_legacy: Vec<_> = UnicodeSegmentation::graphemes(s, false).collect();
+        assert_eq!(our_extended, g, "{s:?} extended");
+        assert_eq!(our_legacy, g, "{s:?} legacy");
 
         // test reverse iterator
         assert!(UnicodeSegmentation::graphemes(s, true)
