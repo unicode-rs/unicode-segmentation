@@ -65,6 +65,7 @@ impl<'a> DoubleEndedIterator for UnicodeWords<'a> {
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
 #[derive(Debug)]
 pub struct UnicodeWordIndices<'a> {
+    #[allow(clippy::type_complexity)]
     inner: Filter<UWordBoundIndices<'a>, fn(&(usize, &str)) -> bool>,
 }
 
@@ -212,7 +213,7 @@ impl<'a> Iterator for UWordBounds<'a> {
         use self::FormatExtendType::*;
         use self::UWordBoundsState::*;
         use crate::tables::word as wd;
-        if self.string.len() == 0 {
+        if self.string.is_empty() {
             return None;
         }
 
@@ -268,17 +269,15 @@ impl<'a> Iterator for UWordBounds<'a> {
             // state enum; the state enum represents the last non-zwj state encountered.
             // When prev_zwj is true, for the purposes of WB3c, we are in the Zwj state,
             // however we are in the previous state for the purposes of all other rules.
-            if prev_zwj {
-                if is_emoji(ch) {
-                    state = Emoji;
-                    continue;
-                }
+            if prev_zwj && is_emoji(ch) {
+                state = Emoji;
+                continue;
             }
             // Don't use `continue` in this match without updating `cat`
             state = match state {
                 Start if cat == wd::WC_CR => {
                     idx += match self.get_next_cat(idx) {
-                        Some(ncat) if ncat == wd::WC_LF => 1, // rule WB3
+                        Some(wd::WC_LF) => 1, // rule WB3
                         _ => 0,
                     };
                     break; // rule WB3a
@@ -443,7 +442,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
         use self::FormatExtendType::*;
         use self::UWordBoundsState::*;
         use crate::tables::word as wd;
-        if self.string.len() == 0 {
+        if self.string.is_empty() {
             return None;
         }
 
@@ -479,10 +478,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
             if cat == wd::WC_Extend || cat == wd::WC_Format || (cat == wd::WC_ZWJ && state != Zwj) {
                 // WB3c has more priority so we should not
                 // fold in that case
-                if match state {
-                    FormatExtend(_) | Start => false,
-                    _ => true,
-                } {
+                if !matches!(state, FormatExtend(_) | Start) {
                     saveidx = previdx;
                     savestate = state;
                     state = FormatExtend(AcceptNone);
@@ -520,7 +516,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                         if state == Start {
                             if cat == wd::WC_LF {
                                 idx -= match self.get_prev_cat(idx) {
-                                    Some(pcat) if pcat == wd::WC_CR => 1, // rule WB3
+                                    Some(wd::WC_CR) => 1, // rule WB3
                                     _ => 0,
                                 };
                             }
@@ -722,7 +718,7 @@ impl<'a> UWordBounds<'a> {
 }
 
 #[inline]
-pub fn new_word_bounds<'b>(s: &'b str) -> UWordBounds<'b> {
+pub fn new_word_bounds(s: &str) -> UWordBounds<'_> {
     UWordBounds {
         string: s,
         cat: None,
@@ -731,7 +727,7 @@ pub fn new_word_bounds<'b>(s: &'b str) -> UWordBounds<'b> {
 }
 
 #[inline]
-pub fn new_word_bound_indices<'b>(s: &'b str) -> UWordBoundIndices<'b> {
+pub fn new_word_bound_indices(s: &str) -> UWordBoundIndices<'_> {
     UWordBoundIndices {
         start_offset: s.as_ptr() as usize,
         iter: new_word_bounds(s),
@@ -742,11 +738,11 @@ pub fn new_word_bound_indices<'b>(s: &'b str) -> UWordBoundIndices<'b> {
 fn has_alphanumeric(s: &&str) -> bool {
     use crate::tables::util::is_alphanumeric;
 
-    s.chars().any(|c| is_alphanumeric(c))
+    s.chars().any(is_alphanumeric)
 }
 
 #[inline]
-pub fn new_unicode_words<'b>(s: &'b str) -> UnicodeWords<'b> {
+pub fn new_unicode_words(s: &str) -> UnicodeWords<'_> {
     use super::UnicodeSegmentation;
 
     UnicodeWords {
@@ -755,7 +751,7 @@ pub fn new_unicode_words<'b>(s: &'b str) -> UnicodeWords<'b> {
 }
 
 #[inline]
-pub fn new_unicode_word_indices<'b>(s: &'b str) -> UnicodeWordIndices<'b> {
+pub fn new_unicode_word_indices(s: &str) -> UnicodeWordIndices<'_> {
     use super::UnicodeSegmentation;
 
     UnicodeWordIndices {

@@ -140,7 +140,7 @@ impl<'a> DoubleEndedIterator for Graphemes<'a> {
 }
 
 #[inline]
-pub fn new_graphemes<'b>(s: &'b str, is_extended: bool) -> Graphemes<'b> {
+pub fn new_graphemes(s: &str, is_extended: bool) -> Graphemes<'_> {
     let len = s.len();
     Graphemes {
         string: s,
@@ -150,7 +150,7 @@ pub fn new_graphemes<'b>(s: &'b str, is_extended: bool) -> Graphemes<'b> {
 }
 
 #[inline]
-pub fn new_grapheme_indices<'b>(s: &'b str, is_extended: bool) -> GraphemeIndices<'b> {
+pub fn new_grapheme_indices(s: &str, is_extended: bool) -> GraphemeIndices<'_> {
     GraphemeIndices {
         start_offset: s.as_ptr() as usize,
         iter: new_graphemes(s, is_extended),
@@ -296,10 +296,10 @@ impl GraphemeCursor {
             GraphemeState::Unknown
         };
         GraphemeCursor {
-            offset: offset,
-            len: len,
-            state: state,
-            is_extended: is_extended,
+            offset,
+            len,
+            state,
+            is_extended,
             cat_before: None,
             cat_after: None,
             pre_context_offset: None,
@@ -406,7 +406,7 @@ impl GraphemeCursor {
         assert!(chunk_start + chunk.len() == self.pre_context_offset.unwrap());
         self.pre_context_offset = None;
         if self.is_extended && chunk_start + chunk.len() == self.offset {
-            let ch = chunk.chars().rev().next().unwrap();
+            let ch = chunk.chars().next_back().unwrap();
             if self.grapheme_category(ch) == gr::GC_Prepend {
                 self.decide(false); // GB9b
                 return;
@@ -417,7 +417,7 @@ impl GraphemeCursor {
             GraphemeState::Emoji => self.handle_emoji(chunk, chunk_start),
             _ => {
                 if self.cat_before.is_none() && self.offset == chunk.len() + chunk_start {
-                    let ch = chunk.chars().rev().next().unwrap();
+                    let ch = chunk.chars().next_back().unwrap();
                     self.cat_before = Some(self.grapheme_category(ch));
                 }
             }
@@ -540,10 +540,10 @@ impl GraphemeCursor {
         if self.state == GraphemeState::NotBreak {
             return Ok(false);
         }
-        if self.offset < chunk_start || self.offset >= chunk_start + chunk.len() {
-            if self.offset > chunk_start + chunk.len() || self.cat_after.is_none() {
-                return Err(GraphemeIncomplete::InvalidOffset);
-            }
+        if (self.offset < chunk_start || self.offset >= chunk_start + chunk.len())
+            && (self.offset > chunk_start + chunk.len() || self.cat_after.is_none())
+        {
+            return Err(GraphemeIncomplete::InvalidOffset);
         }
         if let Some(pre_context_offset) = self.pre_context_offset {
             return Err(GraphemeIncomplete::PreContext(pre_context_offset));
@@ -566,15 +566,15 @@ impl GraphemeCursor {
             }
         }
         if self.cat_before.is_none() {
-            let ch = chunk[..offset_in_chunk].chars().rev().next().unwrap();
+            let ch = chunk[..offset_in_chunk].chars().next_back().unwrap();
             self.cat_before = Some(self.grapheme_category(ch));
         }
         match check_pair(self.cat_before.unwrap(), self.cat_after.unwrap()) {
-            PairResult::NotBreak => return self.decision(false),
-            PairResult::Break => return self.decision(true),
+            PairResult::NotBreak => self.decision(false),
+            PairResult::Break => self.decision(true),
             PairResult::Extended => {
                 let is_extended = self.is_extended;
-                return self.decision(!is_extended);
+                self.decision(!is_extended)
             }
             PairResult::Regional => {
                 if let Some(ris_count) = self.ris_count {

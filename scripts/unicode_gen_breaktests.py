@@ -169,8 +169,8 @@ def create_grapheme_data(f):
         else:
             test_diff.append((allchars, extgraphs, c))
 
-    stype = "&'static [(&'static str, &'static [&'static str])]"
-    dtype = "&'static [(&'static str, &'static [&'static str], &'static [&'static str])]"
+    stype = "&[(&str, &[&str])]"
+    dtype = "&[(&str, &[&str], &[&str])]"
     f.write("    // official Unicode test data\n")
     f.write("    // http://www.unicode.org/Public/%s/ucd/auxiliary/GraphemeBreakTest.txt\n" % unicode.UNICODE_VERSION_NUMBER)
     unicode.emit_table(f, "TEST_SAME", test_same, stype, True, showfun, True)
@@ -185,7 +185,7 @@ def create_words_data(f):
         allchars = [cn for s in c for cn in s]
         test.append((allchars, c))
 
-    wtype = "&'static [(&'static str, &'static [&'static str])]"
+    wtype = "&[(&str, &[&str])]"
     f.write("    // official Unicode test data\n")
     f.write("    // http://www.unicode.org/Public/%s/ucd/auxiliary/WordBreakTest.txt\n" % unicode.UNICODE_VERSION_NUMBER)
     unicode.emit_table(f, "TEST_WORD", test, wtype, True, showfun, True)
@@ -199,7 +199,7 @@ def create_sentence_data(f):
         allchars = [cn for s in c for cn in s]
         test.append((allchars, c))
 
-    wtype = "&'static [(&'static str, &'static [&'static str])]"
+    wtype = "&[(&str, &[&str])]"
     f.write("    // official Unicode test data\n")
     f.write("    // http://www.unicode.org/Public/%s/ucd/auxiliary/SentenceBreakTest.txt\n" % unicode.UNICODE_VERSION_NUMBER)
     unicode.emit_table(f, "TEST_SENTENCE", test, wtype, True, showfun, True)

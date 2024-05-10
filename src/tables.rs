@@ -52,7 +52,7 @@ pub mod util {
 }
 
 mod general_category {
-    const N_table: &'static [(char, char)] = &[
+    const N_table: &[(char, char)] = &[
         ('\u{30}', '\u{39}'), ('\u{b2}', '\u{b3}'), ('\u{b9}', '\u{b9}'), ('\u{bc}', '\u{be}'),
         ('\u{660}', '\u{669}'), ('\u{6f0}', '\u{6f9}'), ('\u{7c0}', '\u{7c9}'), ('\u{966}',
         '\u{96f}'), ('\u{9e6}', '\u{9ef}'), ('\u{9f4}', '\u{9f9}'), ('\u{a66}', '\u{a6f}'),
@@ -106,7 +106,7 @@ mod general_category {
 }
 
 mod derived_property {
-    const Alphabetic_table: &'static [(char, char)] = &[
+    const Alphabetic_table: &[(char, char)] = &[
         ('\u{41}', '\u{5a}'), ('\u{61}', '\u{7a}'), ('\u{aa}', '\u{aa}'), ('\u{b5}', '\u{b5}'),
         ('\u{ba}', '\u{ba}'), ('\u{c0}', '\u{d6}'), ('\u{d8}', '\u{f6}'), ('\u{f8}', '\u{2c1}'),
         ('\u{2c6}', '\u{2d1}'), ('\u{2e0}', '\u{2e4}'), ('\u{2ec}', '\u{2ec}'), ('\u{2ee}',
@@ -408,7 +408,7 @@ pub mod grapheme {
         bsearch_range_value_table(c, &grapheme_cat_table[range], lower, upper)
     }
 
-    const grapheme_cat_lookup: &'static [u16] = &[
+    const grapheme_cat_lookup: &[u16] = &[
         0, 5, 9, 9, 9, 9, 9, 10, 10, 10, 11, 11, 16, 21, 26, 29, 32, 37, 41, 53, 65, 75, 86, 97,
         106, 116, 131, 143, 153, 157, 161, 168, 173, 183, 188, 189, 191, 191, 191, 192, 192, 192,
         192, 192, 192, 192, 192, 198, 206, 209, 211, 219, 219, 232, 233, 242, 258, 262, 270, 270,
@@ -475,7 +475,7 @@ pub mod grapheme {
         1443, 1443, 1443, 1443, 1443
     ];
 
-    const grapheme_cat_table: &'static [(char, char, GraphemeCat)] = &[
+    const grapheme_cat_table: &[(char, char, GraphemeCat)] = &[
         ('\u{0}', '\u{9}', GC_Control), ('\u{a}', '\u{a}', GC_LF), ('\u{b}', '\u{c}', GC_Control),
         ('\u{d}', '\u{d}', GC_CR), ('\u{e}', '\u{1f}', GC_Control), ('\u{7f}', '\u{9f}',
         GC_Control), ('\u{a9}', '\u{a9}', GC_Extended_Pictographic), ('\u{ad}', '\u{ad}',
@@ -1155,7 +1155,7 @@ pub mod word {
         bsearch_range_value_table(c, &word_cat_table[range], lower, upper)
     }
 
-    const word_cat_lookup: &'static [u16] = &[
+    const word_cat_lookup: &[u16] = &[
         0, 14, 22, 22, 22, 22, 24, 30, 36, 36, 38, 43, 55, 66, 78, 82, 92, 103, 110, 120, 142, 161,
         179, 197, 214, 230, 249, 265, 277, 281, 285, 294, 300, 307, 315, 315, 315, 320, 328, 332,
         335, 335, 335, 335, 335, 337, 341, 350, 353, 358, 364, 368, 369, 374, 377, 383, 390, 396,
@@ -1216,7 +1216,7 @@ pub mod word {
         1049, 1049, 1049, 1049
     ];
 
-    const word_cat_table: &'static [(char, char, WordCat)] = &[
+    const word_cat_table: &[(char, char, WordCat)] = &[
         ('\u{a}', '\u{a}', WC_LF), ('\u{b}', '\u{c}', WC_Newline), ('\u{d}', '\u{d}', WC_CR),
         ('\u{20}', '\u{20}', WC_WSegSpace), ('\u{22}', '\u{22}', WC_Double_Quote), ('\u{27}',
         '\u{27}', WC_Single_Quote), ('\u{2c}', '\u{2c}', WC_MidNum), ('\u{2e}', '\u{2e}',
@@ -1735,7 +1735,7 @@ pub mod emoji {
         bsearch_range_value_table(c, &emoji_cat_table[range], lower, upper)
     }
 
-    const emoji_cat_lookup: &'static [u8] = &[
+    const emoji_cat_lookup: &[u8] = &[
         0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
         2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
         2, 2, 2, 4, 4, 6, 8, 8, 8, 10, 14, 14, 15, 15, 19, 21, 22, 37, 41, 41, 41, 42, 42, 42, 42,
@@ -1782,7 +1782,7 @@ pub mod emoji {
         68, 69, 72, 74, 76, 76, 76, 77, 77, 77, 77, 77, 77, 77, 77, 77, 77
     ];
 
-    const emoji_cat_table: &'static [(char, char, EmojiCat)] = &[
+    const emoji_cat_table: &[(char, char, EmojiCat)] = &[
         ('\u{a9}', '\u{a9}', EC_Extended_Pictographic), ('\u{ae}', '\u{ae}',
         EC_Extended_Pictographic), ('\u{203c}', '\u{203c}', EC_Extended_Pictographic), ('\u{2049}',
         '\u{2049}', EC_Extended_Pictographic), ('\u{2122}', '\u{2122}', EC_Extended_Pictographic),
@@ -1902,7 +1902,7 @@ pub mod sentence {
         bsearch_range_value_table(c, &sentence_cat_table[range], lower, upper)
     }
 
-    const sentence_cat_lookup: &'static [u16] = &[
+    const sentence_cat_lookup: &[u16] = &[
         0, 19, 31, 154, 247, 314, 323, 333, 375, 409, 528, 579, 588, 599, 612, 618, 629, 643, 650,
         661, 683, 702, 720, 738, 755, 771, 790, 806, 818, 825, 840, 850, 856, 871, 882, 882, 882,
         887, 895, 901, 904, 904, 904, 904, 904, 907, 912, 922, 929, 938, 944, 951, 954, 960, 965,
@@ -1973,7 +1973,7 @@ pub mod sentence {
         2411, 2411, 2411, 2411, 2411, 2411, 2411, 2411
     ];
 
-    const sentence_cat_table: &'static [(char, char, SentenceCat)] = &[
+    const sentence_cat_table: &[(char, char, SentenceCat)] = &[
         ('\u{9}', '\u{9}', SC_Sp), ('\u{a}', '\u{a}', SC_LF), ('\u{b}', '\u{c}', SC_Sp), ('\u{d}',
         '\u{d}', SC_CR), ('\u{20}', '\u{20}', SC_Sp), ('\u{21}', '\u{21}', SC_STerm), ('\u{22}',
         '\u{22}', SC_Close), ('\u{27}', '\u{29}', SC_Close), ('\u{2c}', '\u{2d}', SC_SContinue),

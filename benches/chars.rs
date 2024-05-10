@@ -6,7 +6,6 @@
 //! is how much slower full unicode handling is.
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use unicode_segmentation;
 
 use std::fs;
 use unicode_segmentation::UnicodeSegmentation;
@@ -24,14 +23,14 @@ const FILES: &[&str] = &[
 
 #[inline(always)]
 fn grapheme(text: &str) {
-    for c in UnicodeSegmentation::graphemes(black_box(&*text), true) {
+    for c in UnicodeSegmentation::graphemes(black_box(text), true) {
         black_box(c);
     }
 }
 
 #[inline(always)]
 fn scalar(text: &str) {
-    for c in black_box(&*text).chars() {
+    for c in black_box(text).chars() {
         black_box(c);
     }
 }
