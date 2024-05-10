@@ -56,14 +56,6 @@
 )]
 #![no_std]
 
-#[cfg(test)]
-#[macro_use]
-extern crate std;
-
-#[cfg(test)]
-#[macro_use]
-extern crate quickcheck;
-
 pub use grapheme::{GraphemeCursor, GraphemeIncomplete};
 pub use grapheme::{GraphemeIndices, Graphemes};
 pub use sentence::{USentenceBoundIndices, USentenceBounds, UnicodeSentences};
@@ -75,11 +67,6 @@ mod grapheme;
 mod tables;
 mod sentence;
 mod word;
-
-#[cfg(test)]
-mod test;
-#[cfg(test)]
-mod testdata;
 
 /// Methods for segmenting strings according to
 /// [Unicode Standard Annex #29](http://www.unicode.org/reports/tr29/).

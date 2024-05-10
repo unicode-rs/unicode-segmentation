@@ -8,9 +8,10 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use super::UnicodeSegmentation;
+use quickcheck::quickcheck;
+use unicode_segmentation::UnicodeSegmentation;
 
-use std::prelude::v1::*;
+mod testdata;
 
 #[test]
 fn test_graphemes() {
@@ -213,20 +214,6 @@ fn test_sentences() {
             "Forward sentence boundaries"
         );
     }
-}
-
-#[test]
-fn test_syriac_abbr_mark() {
-    use crate::tables::word as wd;
-    let (_, _, cat) = wd::word_category('\u{70f}');
-    assert_eq!(cat, wd::WC_ALetter);
-}
-
-#[test]
-fn test_end_of_ayah_cat() {
-    use crate::tables::word as wd;
-    let (_, _, cat) = wd::word_category('\u{6dd}');
-    assert_eq!(cat, wd::WC_Numeric);
 }
 
 quickcheck! {

@@ -31,4 +31,4 @@ jobs:
     - name: Verify regenerated files
       run: ./scripts/unicode.py && diff tables.rs src/tables.rs
     - name: Verify regenerated tests
-      run: ./scripts/unicode_gen_breaktests.py && rustfmt testdata.rs && diff testdata.rs src/testdata.rs
+      run: ./scripts/unicode_gen_breaktests.py && rustfmt testdata.rs && diff testdata.rs tests/testdata/mod.rs

@@ -431,3 +431,22 @@ pub const UNICODE_VERSION: (u64, u64, u64) = (%s, %s, %s);
             sentence_table.extend([(x, y, cat) for (x, y) in sentence_cats[cat]])
         sentence_table.sort(key=lambda w: w[0])
         emit_break_module(rf, sentence_table, list(sentence_cats.keys()), "sentence")
+
+        rf.write("""
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_syriac_abbr_mark() {
+        use crate::tables::word as wd;
+        let (_, _, cat) = wd::word_category('\\u{70f}');
+        assert_eq!(cat, wd::WC_ALetter);
+    }
+
+    #[test]
+    fn test_end_of_ayah_cat() {
+        use crate::tables::word as wd;
+        let (_, _, cat) = wd::word_category('\\u{6dd}');
+        assert_eq!(cat, wd::WC_Numeric);
+    }
+}
+""")

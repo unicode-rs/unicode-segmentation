@@ -2990,3 +2990,20 @@ pub mod sentence {
     ];
 
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_syriac_abbr_mark() {
+        use crate::tables::word as wd;
+        let (_, _, cat) = wd::word_category('\u{70f}');
+        assert_eq!(cat, wd::WC_ALetter);
+    }
+
+    #[test]
+    fn test_end_of_ayah_cat() {
+        use crate::tables::word as wd;
+        let (_, _, cat) = wd::word_category('\u{6dd}');
+        assert_eq!(cat, wd::WC_Numeric);
+    }
+}
