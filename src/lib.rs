@@ -63,9 +63,8 @@ pub use tables::UNICODE_VERSION;
 pub use word::{UWordBoundIndices, UWordBounds, UnicodeWordIndices, UnicodeWords};
 
 mod grapheme;
-#[rustfmt::skip]
-mod tables;
 mod sentence;
+mod tables;
 mod word;
 
 /// Methods for segmenting strings according to
