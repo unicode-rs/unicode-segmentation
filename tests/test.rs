@@ -11,6 +11,7 @@
 use quickcheck::quickcheck;
 use unicode_segmentation::UnicodeSegmentation;
 
+#[rustfmt::skip]
 mod testdata;
 
 #[test]

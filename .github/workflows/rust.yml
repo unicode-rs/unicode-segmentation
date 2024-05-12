@@ -32,6 +32,6 @@ jobs:
     - name: Rustfmt
       run: cargo fmt --all --check
     - name: Verify regenerated files
-      run: ./scripts/unicode.py && rustfmt tables.rs && diff tables.rs src/tables.rs
+      run: ./scripts/unicode.py && diff tables.rs src/tables.rs
     - name: Verify regenerated tests
-      run: ./scripts/unicode_gen_breaktests.py && rustfmt testdata.rs && diff testdata.rs tests/testdata/mod.rs
+      run: ./scripts/unicode_gen_breaktests.py && diff testdata.rs tests/testdata/mod.rs

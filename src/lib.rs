@@ -64,6 +64,7 @@ pub use word::{UWordBoundIndices, UWordBounds, UnicodeWordIndices, UnicodeWords}
 
 mod grapheme;
 mod sentence;
+#[rustfmt::skip]
 mod tables;
 mod word;
 
