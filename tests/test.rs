@@ -8,19 +8,17 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use super::UnicodeSegmentation;
+use quickcheck::quickcheck;
+use unicode_segmentation::UnicodeSegmentation;
 
-use std::prelude::v1::*;
+#[rustfmt::skip]
+mod testdata;
 
 #[test]
 fn test_graphemes() {
     use crate::testdata::{TEST_DIFF, TEST_SAME};
 
-    pub const EXTRA_DIFF: &'static [(
-        &'static str,
-        &'static [&'static str],
-        &'static [&'static str],
-    )] = &[
+    pub const EXTRA_DIFF: &[(&str, &[&str], &[&str])] = &[
         // Official test suite doesn't include two Prepend chars between two other chars.
         (
             "\u{20}\u{600}\u{600}\u{20}",
@@ -35,7 +33,7 @@ fn test_graphemes() {
         ),
     ];
 
-    pub const EXTRA_SAME: &'static [(&'static str, &'static [&'static str])] = &[
+    pub const EXTRA_SAME: &[(&str, &[&str])] = &[
         // family emoji (more than two emoji joined by ZWJ)
         (
             "\u{1f468}\u{200d}\u{1f467}\u{200d}\u{1f466}",
@@ -50,12 +48,11 @@ fn test_graphemes() {
     ];
 
     for &(s, g) in TEST_SAME.iter().chain(EXTRA_SAME) {
-        if s.starts_with("क\u{94d}") || s.starts_with("क\u{93c}") {
-            continue; // TODO: fix these
-        }
         // test forward iterator
-        assert!(UnicodeSegmentation::graphemes(s, true).eq(g.iter().cloned()));
-        assert!(UnicodeSegmentation::graphemes(s, false).eq(g.iter().cloned()));
+        let our_extended: Vec<_> = UnicodeSegmentation::graphemes(s, true).collect();
+        let our_legacy: Vec<_> = UnicodeSegmentation::graphemes(s, false).collect();
+        assert_eq!(our_extended, g, "{s:?} extended");
+        assert_eq!(our_legacy, g, "{s:?} legacy");
 
         // test reverse iterator
         assert!(UnicodeSegmentation::graphemes(s, true)
@@ -116,7 +113,7 @@ fn test_words() {
 
     // Unicode's official tests don't really test longer chains of flag emoji
     // TODO This could be improved with more tests like flag emoji with interspersed Extend chars and ZWJ
-    const EXTRA_TESTS: &'static [(&'static str, &'static [&'static str])] = &[
+    const EXTRA_TESTS: &[(&str, &[&str])] = &[
         (
             "🇦🇫🇦🇽🇦🇱🇩🇿🇦🇸🇦🇩🇦🇴",
             &["🇦🇫", "🇦🇽", "🇦🇱", "🇩🇿", "🇦🇸", "🇦🇩", "🇦🇴"],
@@ -213,20 +210,6 @@ fn test_sentences() {
             "Forward sentence boundaries"
         );
     }
-}
-
-#[test]
-fn test_syriac_abbr_mark() {
-    use crate::tables::word as wd;
-    let (_, _, cat) = wd::word_category('\u{70f}');
-    assert_eq!(cat, wd::WC_ALetter);
-}
-
-#[test]
-fn test_end_of_ayah_cat() {
-    use crate::tables::word as wd;
-    let (_, _, cat) = wd::word_category('\u{6dd}');
-    assert_eq!(cat, wd::WC_Numeric);
 }
 
 quickcheck! {

@@ -7,28 +7,31 @@ on:
     branches: [ master ]
 
 env:
+  CARGO_INCREMENTAL: 0
   CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTFLAGS: -D warnings
+  RUSTDOCFLAGS: -D warnings
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v2
     - name: Build
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
+    - name: Run clippy
+      run: cargo clippy --all-targets --all --verbose
+
   fmt:
-
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v2
     - name: Rustfmt
-      run: cargo fmt --check
+      run: cargo fmt --all --check
     - name: Verify regenerated files
       run: ./scripts/unicode.py && diff tables.rs src/tables.rs
     - name: Verify regenerated tests
-      run: ./scripts/unicode_gen_breaktests.py && rustfmt testdata.rs && diff testdata.rs src/testdata.rs
+      run: ./scripts/unicode_gen_breaktests.py && diff testdata.rs tests/testdata/mod.rs

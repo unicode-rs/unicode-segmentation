@@ -264,9 +264,7 @@ mod fwd {
             }
 
             // SB2 https://unicode.org/reports/tr29/#SB2
-            if self.state.match1(StatePart::Sot) {
-                None
-            } else if self.state.match1(StatePart::Eot) {
+            if self.state.match1(StatePart::Sot) || self.state.match1(StatePart::Eot) {
                 None
             } else {
                 self.state = self.state.end();
@@ -275,7 +273,7 @@ mod fwd {
         }
     }
 
-    pub fn new_sentence_breaks<'a>(source: &'a str) -> SentenceBreaks<'a> {
+    pub fn new_sentence_breaks(source: &str) -> SentenceBreaks<'_> {
         SentenceBreaks {
             string: source,
             pos: 0,
@@ -329,7 +327,7 @@ pub struct USentenceBoundIndices<'a> {
 }
 
 #[inline]
-pub fn new_sentence_bounds<'a>(source: &'a str) -> USentenceBounds<'a> {
+pub fn new_sentence_bounds(source: &str) -> USentenceBounds<'_> {
     USentenceBounds {
         iter: fwd::new_sentence_breaks(source),
         sentence_start: None,
@@ -337,7 +335,7 @@ pub fn new_sentence_bounds<'a>(source: &'a str) -> USentenceBounds<'a> {
 }
 
 #[inline]
-pub fn new_sentence_bound_indices<'a>(source: &'a str) -> USentenceBoundIndices<'a> {
+pub fn new_sentence_bound_indices(source: &str) -> USentenceBoundIndices<'_> {
     USentenceBoundIndices {
         start_offset: source.as_ptr() as usize,
         iter: new_sentence_bounds(source),
@@ -345,12 +343,12 @@ pub fn new_sentence_bound_indices<'a>(source: &'a str) -> USentenceBoundIndices<
 }
 
 #[inline]
-pub fn new_unicode_sentences<'b>(s: &'b str) -> UnicodeSentences<'b> {
+pub fn new_unicode_sentences(s: &str) -> UnicodeSentences<'_> {
     use super::UnicodeSegmentation;
     use crate::tables::util::is_alphanumeric;
 
     fn has_alphanumeric(s: &&str) -> bool {
-        s.chars().any(|c| is_alphanumeric(c))
+        s.chars().any(is_alphanumeric)
     }
     let has_alphanumeric: fn(&&str) -> bool = has_alphanumeric; // coerce to fn pointer
 
@@ -384,7 +382,7 @@ impl<'a> Iterator for USentenceBounds<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<&'a str> {
-        if self.sentence_start == None {
+        if self.sentence_start.is_none() {
             if let Some(start_pos) = self.iter.next() {
                 self.sentence_start = Some(start_pos)
             } else {
