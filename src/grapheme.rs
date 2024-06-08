@@ -462,10 +462,21 @@ impl GraphemeCursor {
         }
     }
 
+    /// For handling rule GB9c:
+    ///
+    /// There's an `InCB=Consonant` after this, and we need to look back
+    /// to verify whether there should be a break.
+    ///
+    /// Seek backward to find an `InCB=Linker` preceded by an `InCB=Consonsnt`
+    /// (potentially separated by some number of `InCB=Linker` or `InCB=Extend`).
+    /// If we find the consonant in question, then there's no break; if we find a consonant
+    /// with no linker, or a non-linker non-extend non-consonant, or the start of text, there's a break;
+    /// otherwise we need more context
     #[inline]
     fn handle_incb_consonant(&mut self, chunk: &str, chunk_start: usize) {
         use crate::tables::{self, grapheme as gr};
 
+        // GB9c only applies to extended grapheme clusters
         if !self.is_extended {
             self.decide(true);
             return;
@@ -475,23 +486,28 @@ impl GraphemeCursor {
 
         for ch in chunk.chars().rev() {
             if tables::is_incb_linker(ch) {
+                // We found an InCB linker
                 incb_linker_count += 1;
                 self.incb_linker_count = Some(incb_linker_count);
             } else if tables::derived_property::InCB_Extend(ch) {
-                // continue
+                // We ignore InCB extends, continue
             } else {
+                // Prev character is neither linker nor extend, break suppressed iff it's InCB=Consonant
                 let result = !(self.incb_linker_count.unwrap_or(0) > 0
                     && self.grapheme_category(ch) == gr::GC_InCB_Consonant);
                 self.decide(result);
                 return;
             }
         }
+
         if chunk_start == 0 {
+            // Start of text and we still haven't found a consonant, so break
             self.decide(true);
-            return;
+        } else {
+            // We need more context
+            self.pre_context_offset = Some(chunk_start);
+            self.state = GraphemeState::InCbConsonant;
         }
-        self.pre_context_offset = Some(chunk_start);
-        self.state = GraphemeState::InCbConsonant;
     }
 
     #[inline]
@@ -509,10 +525,10 @@ impl GraphemeCursor {
         self.ris_count = Some(ris_count);
         if chunk_start == 0 {
             self.decide((ris_count % 2) == 0);
-            return;
+        } else {
+            self.pre_context_offset = Some(chunk_start);
+            self.state = GraphemeState::Regional;
         }
-        self.pre_context_offset = Some(chunk_start);
-        self.state = GraphemeState::Regional;
     }
 
     #[inline]
@@ -540,10 +556,10 @@ impl GraphemeCursor {
         }
         if chunk_start == 0 {
             self.decide(true);
-            return;
+        } else {
+            self.pre_context_offset = Some(chunk_start);
+            self.state = GraphemeState::Emoji;
         }
-        self.pre_context_offset = Some(chunk_start);
-        self.state = GraphemeState::Emoji;
     }
 
     #[inline]
