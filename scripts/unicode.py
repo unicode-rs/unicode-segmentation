@@ -232,19 +232,27 @@ pub mod util {
 
     #[inline]
     fn is_alphabetic(c: char) -> bool {
-        match c {
-            'a' ..= 'z' | 'A' ..= 'Z' => true,
-            c if c > '\x7f' => super::derived_property::Alphabetic(c),
-            _ => false,
+        if super::UNICODE_VERSION_U8 == char::UNICODE_VERSION {
+            c.is_alphabetic()
+        } else {
+            match c {
+                'a' ..= 'z' | 'A' ..= 'Z' => true,
+                c if c > '\\x7f' => super::derived_property::Alphabetic(c),
+                _ => false,
+            }
         }
     }
 
     #[inline]
     fn is_numeric(c: char) -> bool {
-        match c {
-            '0' ..= '9' => true,
-            c if c > '\x7f' => super::general_category::N(c),
-            _ => false,
+        if super::UNICODE_VERSION_U8 == char::UNICODE_VERSION {
+            c.is_numeric()
+        } else {
+            match c {
+                '0' ..= '9' => true,
+                c if c > '\\x7f' => super::general_category::N(c),
+                _ => false,
+            }
         }
     }
 
@@ -388,6 +396,10 @@ if __name__ == "__main__":
 /// The version of [Unicode](http://www.unicode.org/)
 /// that this version of unicode-segmentation is based on.
 pub const UNICODE_VERSION: (u64, u64, u64) = (%s, %s, %s);
+""" % UNICODE_VERSION)
+
+        rf.write("""
+const UNICODE_VERSION_U8: (u8, u8, u8) = (%s, %s, %s);
 """ % UNICODE_VERSION)
 
         # download and parse all the data
