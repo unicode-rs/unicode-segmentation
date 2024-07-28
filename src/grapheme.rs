@@ -695,7 +695,10 @@ impl GraphemeCursor {
             return Ok(None);
         }
         let mut iter = chunk[self.offset - chunk_start..].chars();
-        let mut ch = iter.next().unwrap();
+        let mut ch = match iter.next() {
+            Some(ch) => ch,
+            None => return Err(GraphemeIncomplete::NextChunk),
+        };
         loop {
             if self.resuming {
                 if self.cat_after.is_none() {
