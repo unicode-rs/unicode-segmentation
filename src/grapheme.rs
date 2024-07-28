@@ -412,7 +412,7 @@ impl GraphemeCursor {
     /// ```
     pub fn provide_context(&mut self, chunk: &str, chunk_start: usize) {
         use crate::tables::grapheme as gr;
-        assert!(chunk_start + chunk.len() == self.pre_context_offset.unwrap());
+        assert!(chunk_start.saturating_add(chunk.len()) == self.pre_context_offset.unwrap());
         self.pre_context_offset = None;
         if self.is_extended && chunk_start + chunk.len() == self.offset {
             let ch = chunk.chars().next_back().unwrap();
@@ -598,15 +598,15 @@ impl GraphemeCursor {
         if self.state == GraphemeState::NotBreak {
             return Ok(false);
         }
-        if (self.offset < chunk_start || self.offset >= chunk_start + chunk.len())
-            && (self.offset > chunk_start + chunk.len() || self.cat_after.is_none())
+        if (self.offset < chunk_start || self.offset >= chunk_start.saturating_add(chunk.len()))
+            && (self.offset > chunk_start.saturating_add(chunk.len()) || self.cat_after.is_none())
         {
             return Err(GraphemeIncomplete::InvalidOffset);
         }
         if let Some(pre_context_offset) = self.pre_context_offset {
             return Err(GraphemeIncomplete::PreContext(pre_context_offset));
         }
-        let offset_in_chunk = self.offset - chunk_start;
+        let offset_in_chunk = self.offset.saturating_sub(chunk_start);
         if self.cat_after.is_none() {
             let ch = chunk[offset_in_chunk..].chars().next().unwrap();
             self.cat_after = Some(self.grapheme_category(ch));
@@ -694,7 +694,7 @@ impl GraphemeCursor {
         if self.offset == self.len {
             return Ok(None);
         }
-        let mut iter = chunk[self.offset - chunk_start..].chars();
+        let mut iter = chunk[self.offset.saturating_sub(chunk_start)..].chars();
         let mut ch = match iter.next() {
             Some(ch) => ch,
             None => return Err(GraphemeIncomplete::NextChunk),
@@ -705,7 +705,7 @@ impl GraphemeCursor {
                     self.cat_after = Some(self.grapheme_category(ch));
                 }
             } else {
-                self.offset += ch.len_utf8();
+                self.offset = self.offset.saturating_add(ch.len_utf8());
                 self.state = GraphemeState::Unknown;
                 self.cat_before = self.cat_after.take();
                 if self.cat_before.is_none() {
@@ -784,7 +784,7 @@ impl GraphemeCursor {
         if self.offset == chunk_start {
             return Err(GraphemeIncomplete::PrevChunk);
         }
-        let mut iter = chunk[..self.offset - chunk_start].chars().rev();
+        let mut iter = chunk[..self.offset.saturating_sub(chunk_start)].chars().rev();
         let mut ch = iter.next().unwrap();
         loop {
             if self.offset == chunk_start {
