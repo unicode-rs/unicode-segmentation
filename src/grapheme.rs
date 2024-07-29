@@ -781,7 +781,9 @@ impl GraphemeCursor {
         if self.offset == chunk_start {
             return Err(GraphemeIncomplete::PrevChunk);
         }
-        let mut iter = chunk[..self.offset.saturating_sub(chunk_start)].chars().rev();
+        let mut iter = chunk[..self.offset.saturating_sub(chunk_start)]
+            .chars()
+            .rev();
         let mut ch = iter.next().unwrap();
         loop {
             if self.offset == chunk_start {
