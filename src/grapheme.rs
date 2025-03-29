@@ -8,8 +8,9 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use core::cmp;
+use core::{cmp, mem};
 
+use crate::str_ref::StrRef;
 use crate::tables::grapheme::GraphemeCat;
 
 /// External iterator for grapheme clusters and byte offsets.
@@ -20,12 +21,12 @@ use crate::tables::grapheme::GraphemeCat;
 /// [`grapheme_indices`]: trait.UnicodeSegmentation.html#tymethod.grapheme_indices
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
 #[derive(Debug, Clone)]
-pub struct GraphemeIndices<'a> {
+pub struct GraphemeIndices<S: StrRef> {
     start_offset: usize,
-    iter: Graphemes<'a>,
+    iter: Graphemes<S>,
 }
 
-impl<'a> GraphemeIndices<'a> {
+impl<S: StrRef + Clone> GraphemeIndices<S> {
     #[inline]
     /// View the underlying data (the part yet to be iterated) as a slice of the original string.
     ///
@@ -39,16 +40,16 @@ impl<'a> GraphemeIndices<'a> {
     /// iter.next();
     /// assert_eq!(iter.as_str(), "");
     /// ```
-    pub fn as_str(&self) -> &'a str {
+    pub fn as_str(&self) -> S {
         self.iter.as_str()
     }
 }
 
-impl<'a> Iterator for GraphemeIndices<'a> {
-    type Item = (usize, &'a str);
+impl<S: StrRef> Iterator for GraphemeIndices<S> {
+    type Item = (usize, S);
 
     #[inline]
-    fn next(&mut self) -> Option<(usize, &'a str)> {
+    fn next(&mut self) -> Option<(usize, S)> {
         self.iter
             .next()
             .map(|s| (s.as_ptr() as usize - self.start_offset, s))
@@ -60,9 +61,9 @@ impl<'a> Iterator for GraphemeIndices<'a> {
     }
 }
 
-impl<'a> DoubleEndedIterator for GraphemeIndices<'a> {
+impl<S: StrRef> DoubleEndedIterator for GraphemeIndices<S> {
     #[inline]
-    fn next_back(&mut self) -> Option<(usize, &'a str)> {
+    fn next_back(&mut self) -> Option<(usize, S)> {
         self.iter
             .next_back()
             .map(|s| (s.as_ptr() as usize - self.start_offset, s))
@@ -78,13 +79,12 @@ impl<'a> DoubleEndedIterator for GraphemeIndices<'a> {
 /// [`graphemes`]: trait.UnicodeSegmentation.html#tymethod.graphemes
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
 #[derive(Clone, Debug)]
-pub struct Graphemes<'a> {
-    string: &'a str,
-    cursor: GraphemeCursor,
-    cursor_back: GraphemeCursor,
+pub struct Graphemes<S: StrRef> {
+    string: S,
+    is_extended: bool,
 }
 
-impl<'a> Graphemes<'a> {
+impl<S: StrRef + Clone> Graphemes<S> {
     #[inline]
     /// View the underlying data (the part yet to be iterated) as a slice of the original string.
     ///
@@ -98,59 +98,64 @@ impl<'a> Graphemes<'a> {
     /// iter.next();
     /// assert_eq!(iter.as_str(), "");
     /// ```
-    pub fn as_str(&self) -> &'a str {
-        &self.string[self.cursor.cur_cursor()..self.cursor_back.cur_cursor()]
+    pub fn as_str(&self) -> S {
+        // TODO: This is not great because the cloning might be unexpected by the caller and because we require `S` to implement `Clone`.
+        // It might be better to expose a reference to `self.string` or the underlying `str`.
+        // The same applies to the other `as_str` methods in the crate.
+        self.string.clone()
     }
 }
 
-impl<'a> Iterator for Graphemes<'a> {
-    type Item = &'a str;
+impl<S: StrRef> Iterator for Graphemes<S> {
+    type Item = S;
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let slen = self.cursor_back.cur_cursor() - self.cursor.cur_cursor();
+        let slen = self.string.len();
         (cmp::min(slen, 1), Some(slen))
     }
 
     #[inline]
-    fn next(&mut self) -> Option<&'a str> {
-        let start = self.cursor.cur_cursor();
-        if start == self.cursor_back.cur_cursor() {
+    fn next(&mut self) -> Option<S> {
+        if self.string.is_empty() {
             return None;
         }
-        let next = self.cursor.next_boundary(self.string, 0).unwrap().unwrap();
-        Some(&self.string[start..next])
+        let mut cursor = GraphemeCursor::new(0, self.string.len(), self.is_extended);
+        let next = cursor.next_boundary(&self.string, 0).unwrap().unwrap();
+
+        let retstr;
+        (retstr, self.string) = mem::take(&mut self.string).split_at(next);
+        Some(retstr)
     }
 }
 
-impl<'a> DoubleEndedIterator for Graphemes<'a> {
+impl<S: StrRef> DoubleEndedIterator for Graphemes<S> {
     #[inline]
-    fn next_back(&mut self) -> Option<&'a str> {
-        let end = self.cursor_back.cur_cursor();
-        if end == self.cursor.cur_cursor() {
+    fn next_back(&mut self) -> Option<S> {
+        if self.string.is_empty() {
             return None;
         }
-        let prev = self
-            .cursor_back
-            .prev_boundary(self.string, 0)
-            .unwrap()
-            .unwrap();
-        Some(&self.string[prev..end])
+
+        let mut cursor =
+            GraphemeCursor::new(self.string.len(), self.string.len(), self.is_extended);
+        let prev = cursor.prev_boundary(&self.string, 0).unwrap().unwrap();
+
+        let retstr;
+        (self.string, retstr) = mem::take(&mut self.string).split_at(prev);
+        Some(retstr)
     }
 }
 
 #[inline]
-pub fn new_graphemes(s: &str, is_extended: bool) -> Graphemes<'_> {
-    let len = s.len();
+pub fn new_graphemes<S: StrRef>(s: S, is_extended: bool) -> Graphemes<S> {
     Graphemes {
         string: s,
-        cursor: GraphemeCursor::new(0, len, is_extended),
-        cursor_back: GraphemeCursor::new(len, len, is_extended),
+        is_extended,
     }
 }
 
 #[inline]
-pub fn new_grapheme_indices(s: &str, is_extended: bool) -> GraphemeIndices<'_> {
+pub fn new_grapheme_indices(s: &str, is_extended: bool) -> GraphemeIndices<&str> {
     GraphemeIndices {
         start_offset: s.as_ptr() as usize,
         iter: new_graphemes(s, is_extended),

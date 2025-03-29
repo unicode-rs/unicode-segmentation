@@ -187,6 +187,31 @@ fn test_words() {
 }
 
 #[test]
+fn test_mutation() {
+    // Reversing the letters of each word, preserving grapheme clusters.
+    // We reverse the bytes inside each individual grapheme cluster first, such that they return to their original order when we reverse the bytes of the whole word.
+    let mut s = "abc def ghi".to_string();
+    for word in s.unicode_words_mut() {
+        for grapheme in word.graphemes_mut(true) {
+            unsafe { grapheme.as_bytes_mut().reverse() };
+        }
+        // If one wants to be precise, the call to `as_bytes_mut` is undefined behavior because `word` is not guaranteed to hold valid UTF-8 at this point.
+        unsafe { word.as_bytes_mut().reverse() };
+    }
+    assert_eq!(s, "cba fed ihg");
+
+    // Capitalizing each word
+    let mut input = "a big important title".to_string();
+    for word in input.unicode_words_mut() {
+        word.graphemes_mut(true)
+            .next()
+            .unwrap()
+            .make_ascii_uppercase();
+    }
+    assert_eq!(input, "A Big Important Title");
+}
+
+#[test]
 fn test_sentences() {
     use crate::testdata::TEST_SENTENCE;
 

@@ -65,6 +65,7 @@ pub use word::{UWordBoundIndices, UWordBounds, UnicodeWordIndices, UnicodeWords}
 mod grapheme;
 mod sentence;
 #[rustfmt::skip]
+mod str_ref;
 mod tables;
 mod word;
 
@@ -96,7 +97,11 @@ pub trait UnicodeSegmentation {
     ///
     /// assert_eq!(&gr2[..], b);
     /// ```
-    fn graphemes(&self, is_extended: bool) -> Graphemes<'_>;
+    // TODO: There are some breaking changes like this one.
+    fn graphemes(&self, is_extended: bool) -> Graphemes<&str>;
+
+    #[allow(missing_docs, unsafe_code)]
+    fn graphemes_mut(&mut self, is_extended: bool) -> Graphemes<&mut str>;
 
     /// Returns an iterator over the grapheme clusters of `self` and their
     /// byte offsets. See `graphemes()` for more information.
@@ -111,7 +116,7 @@ pub trait UnicodeSegmentation {
     ///
     /// assert_eq!(&gr_inds[..], b);
     /// ```
-    fn grapheme_indices(&self, is_extended: bool) -> GraphemeIndices<'_>;
+    fn grapheme_indices(&self, is_extended: bool) -> GraphemeIndices<&str>;
 
     /// Returns an iterator over the words of `self`, separated on
     /// [UAX#29 word boundaries](http://www.unicode.org/reports/tr29/#Word_Boundaries).
@@ -133,7 +138,10 @@ pub trait UnicodeSegmentation {
     ///
     /// assert_eq!(&uw1[..], b);
     /// ```
-    fn unicode_words(&self) -> UnicodeWords<'_>;
+    fn unicode_words(&self) -> UnicodeWords<&str>;
+
+    #[allow(missing_docs, unsafe_code)]
+    fn unicode_words_mut(&mut self) -> UnicodeWords<&mut str>;
 
     /// Returns an iterator over the words of `self`, separated on
     /// [UAX#29 word boundaries](http://www.unicode.org/reports/tr29/#Word_Boundaries), and their
@@ -157,7 +165,7 @@ pub trait UnicodeSegmentation {
     ///
     /// assert_eq!(&uwi1[..], b);
     /// ```
-    fn unicode_word_indices(&self) -> UnicodeWordIndices<'_>;
+    fn unicode_word_indices(&self) -> UnicodeWordIndices<&str>;
 
     /// Returns an iterator over substrings of `self` separated on
     /// [UAX#29 word boundaries](http://www.unicode.org/reports/tr29/#Word_Boundaries).
@@ -173,7 +181,7 @@ pub trait UnicodeSegmentation {
     ///
     /// assert_eq!(&swu1[..], b);
     /// ```
-    fn split_word_bounds(&self) -> UWordBounds<'_>;
+    fn split_word_bounds(&self) -> UWordBounds<&str>;
 
     /// Returns an iterator over substrings of `self`, split on UAX#29 word boundaries,
     /// and their offsets. See `split_word_bounds()` for more information.
@@ -188,7 +196,7 @@ pub trait UnicodeSegmentation {
     ///
     /// assert_eq!(&swi1[..], b);
     /// ```
-    fn split_word_bound_indices(&self) -> UWordBoundIndices<'_>;
+    fn split_word_bound_indices(&self) -> UWordBoundIndices<&str>;
 
     /// Returns an iterator over substrings of `self` separated on
     /// [UAX#29 sentence boundaries](http://www.unicode.org/reports/tr29/#Sentence_Boundaries).
@@ -248,32 +256,42 @@ pub trait UnicodeSegmentation {
 
 impl UnicodeSegmentation for str {
     #[inline]
-    fn graphemes(&self, is_extended: bool) -> Graphemes {
+    fn graphemes(&self, is_extended: bool) -> Graphemes<&str> {
         grapheme::new_graphemes(self, is_extended)
     }
 
     #[inline]
-    fn grapheme_indices(&self, is_extended: bool) -> GraphemeIndices {
+    fn graphemes_mut(&mut self, is_extended: bool) -> Graphemes<&mut str> {
+        grapheme::new_graphemes(self, is_extended)
+    }
+
+    #[inline]
+    fn grapheme_indices(&self, is_extended: bool) -> GraphemeIndices<&str> {
         grapheme::new_grapheme_indices(self, is_extended)
     }
 
     #[inline]
-    fn unicode_words(&self) -> UnicodeWords {
+    fn unicode_words(&self) -> UnicodeWords<&str> {
         word::new_unicode_words(self)
     }
 
     #[inline]
-    fn unicode_word_indices(&self) -> UnicodeWordIndices {
+    fn unicode_words_mut(&mut self) -> UnicodeWords<&mut str> {
+        word::new_unicode_words(self)
+    }
+
+    #[inline]
+    fn unicode_word_indices(&self) -> UnicodeWordIndices<&str> {
         word::new_unicode_word_indices(self)
     }
 
     #[inline]
-    fn split_word_bounds(&self) -> UWordBounds {
+    fn split_word_bounds(&self) -> UWordBounds<&str> {
         word::new_word_bounds(self)
     }
 
     #[inline]
-    fn split_word_bound_indices(&self) -> UWordBoundIndices {
+    fn split_word_bound_indices(&self) -> UWordBoundIndices<&str> {
         word::new_word_bound_indices(self)
     }
 

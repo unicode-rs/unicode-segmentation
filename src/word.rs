@@ -8,9 +8,10 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use core::cmp;
+use core::{cmp, mem};
 use core::iter::Filter;
 
+use crate::str_ref::StrRef;
 use crate::tables::word::WordCat;
 
 /// An iterator over the substrings of a string which, after splitting the string on
@@ -26,15 +27,15 @@ use crate::tables::word::WordCat;
 /// [`unicode_words`]: trait.UnicodeSegmentation.html#tymethod.unicode_words
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
 #[derive(Debug)]
-pub struct UnicodeWords<'a> {
-    inner: Filter<UWordBounds<'a>, fn(&&str) -> bool>,
+pub struct UnicodeWords<S: StrRef> {
+    inner: Filter<UWordBounds<S>, fn(&S) -> bool>,
 }
 
-impl<'a> Iterator for UnicodeWords<'a> {
-    type Item = &'a str;
+impl<S: StrRef> Iterator for UnicodeWords<S> {
+    type Item = S;
 
     #[inline]
-    fn next(&mut self) -> Option<&'a str> {
+    fn next(&mut self) -> Option<S> {
         self.inner.next()
     }
 
@@ -43,9 +44,9 @@ impl<'a> Iterator for UnicodeWords<'a> {
         self.inner.size_hint()
     }
 }
-impl<'a> DoubleEndedIterator for UnicodeWords<'a> {
+impl<S: StrRef> DoubleEndedIterator for UnicodeWords<S> {
     #[inline]
-    fn next_back(&mut self) -> Option<&'a str> {
+    fn next_back(&mut self) -> Option<S> {
         self.inner.next_back()
     }
 }
@@ -64,16 +65,16 @@ impl<'a> DoubleEndedIterator for UnicodeWords<'a> {
 /// [`unicode_word_indices`]: trait.UnicodeSegmentation.html#tymethod.unicode_word_indices
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
 #[derive(Debug)]
-pub struct UnicodeWordIndices<'a> {
+pub struct UnicodeWordIndices<S: StrRef> {
     #[allow(clippy::type_complexity)]
-    inner: Filter<UWordBoundIndices<'a>, fn(&(usize, &str)) -> bool>,
+    inner: Filter<UWordBoundIndices<S>, fn(&(usize, S)) -> bool>,
 }
 
-impl<'a> Iterator for UnicodeWordIndices<'a> {
-    type Item = (usize, &'a str);
+impl<S: StrRef> Iterator for UnicodeWordIndices<S> {
+    type Item = (usize, S);
 
     #[inline]
-    fn next(&mut self) -> Option<(usize, &'a str)> {
+    fn next(&mut self) -> Option<(usize, S)> {
         self.inner.next()
     }
 
@@ -82,9 +83,9 @@ impl<'a> Iterator for UnicodeWordIndices<'a> {
         self.inner.size_hint()
     }
 }
-impl<'a> DoubleEndedIterator for UnicodeWordIndices<'a> {
+impl<S: StrRef> DoubleEndedIterator for UnicodeWordIndices<S> {
     #[inline]
-    fn next_back(&mut self) -> Option<(usize, &'a str)> {
+    fn next_back(&mut self) -> Option<(usize, S)> {
         self.inner.next_back()
     }
 }
@@ -97,11 +98,21 @@ impl<'a> DoubleEndedIterator for UnicodeWordIndices<'a> {
 ///
 /// [`split_word_bounds`]: trait.UnicodeSegmentation.html#tymethod.split_word_bounds
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
-#[derive(Debug, Clone)]
-pub struct UWordBounds<'a> {
-    string: &'a str,
+#[derive(Debug)]
+pub struct UWordBounds<S: StrRef> {
+    string: S,
     cat: Option<WordCat>,
     catb: Option<WordCat>,
+}
+
+impl<S: StrRef + Clone> Clone for UWordBounds<S> {
+    fn clone(&self) -> Self {
+        UWordBounds {
+            string: self.string.clone(),
+            cat: self.cat,
+            catb: self.catb,
+        }
+    }
 }
 
 /// External iterator for word boundaries and byte offsets.
@@ -112,12 +123,12 @@ pub struct UWordBounds<'a> {
 /// [`split_word_bound_indices`]: trait.UnicodeSegmentation.html#tymethod.split_word_bound_indices
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
 #[derive(Debug, Clone)]
-pub struct UWordBoundIndices<'a> {
+pub struct UWordBoundIndices<S: StrRef> {
     start_offset: usize,
-    iter: UWordBounds<'a>,
+    iter: UWordBounds<S>,
 }
 
-impl<'a> UWordBoundIndices<'a> {
+impl<S: StrRef + Clone> UWordBoundIndices<S> {
     #[inline]
     /// View the underlying data (the part yet to be iterated) as a slice of the original string.
     ///
@@ -130,16 +141,16 @@ impl<'a> UWordBoundIndices<'a> {
     /// iter.next();
     /// assert_eq!(iter.as_str(), "world");
     /// ```
-    pub fn as_str(&self) -> &'a str {
+    pub fn as_str(&self) -> S {
         self.iter.as_str()
     }
 }
 
-impl<'a> Iterator for UWordBoundIndices<'a> {
-    type Item = (usize, &'a str);
+impl<S: StrRef> Iterator for UWordBoundIndices<S> {
+    type Item = (usize, S);
 
     #[inline]
-    fn next(&mut self) -> Option<(usize, &'a str)> {
+    fn next(&mut self) -> Option<(usize, S)> {
         self.iter
             .next()
             .map(|s| (s.as_ptr() as usize - self.start_offset, s))
@@ -151,9 +162,9 @@ impl<'a> Iterator for UWordBoundIndices<'a> {
     }
 }
 
-impl<'a> DoubleEndedIterator for UWordBoundIndices<'a> {
+impl<S: StrRef> DoubleEndedIterator for UWordBoundIndices<S> {
     #[inline]
-    fn next_back(&mut self) -> Option<(usize, &'a str)> {
+    fn next_back(&mut self) -> Option<(usize, S)> {
         self.iter
             .next_back()
             .map(|s| (s.as_ptr() as usize - self.start_offset, s))
@@ -199,8 +210,8 @@ fn is_emoji(ch: char) -> bool {
     emoji::emoji_category(ch).2 == emoji::EmojiCat::EC_Extended_Pictographic
 }
 
-impl<'a> Iterator for UWordBounds<'a> {
-    type Item = &'a str;
+impl<S: StrRef> Iterator for UWordBounds<S> {
+    type Item = S;
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -209,7 +220,7 @@ impl<'a> Iterator for UWordBounds<'a> {
     }
 
     #[inline]
-    fn next(&mut self) -> Option<&'a str> {
+    fn next(&mut self) -> Option<S> {
         use self::FormatExtendType::*;
         use self::UWordBoundsState::*;
         use crate::tables::word as wd;
@@ -430,15 +441,15 @@ impl<'a> Iterator for UWordBounds<'a> {
             None
         };
 
-        let retstr = &self.string[..idx];
-        self.string = &self.string[idx..];
+        let retstr;
+        (retstr, self.string) = mem::take(&mut self.string).split_at(idx);
         Some(retstr)
     }
 }
 
-impl<'a> DoubleEndedIterator for UWordBounds<'a> {
+impl<S: StrRef> DoubleEndedIterator for UWordBounds<S> {
     #[inline]
-    fn next_back(&mut self) -> Option<&'a str> {
+    fn next_back(&mut self) -> Option<S> {
         use self::FormatExtendType::*;
         use self::UWordBoundsState::*;
         use crate::tables::word as wd;
@@ -670,13 +681,13 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
             }
         };
 
-        let retstr = &self.string[idx..];
-        self.string = &self.string[..idx];
+        let retstr;
+        (self.string, retstr) = mem::take(&mut self.string).split_at(idx);
         Some(retstr)
     }
 }
 
-impl<'a> UWordBounds<'a> {
+impl<S: StrRef + Clone> UWordBounds<S> {
     #[inline]
     /// View the underlying data (the part yet to be iterated) as a slice of the original string.
     ///
@@ -689,10 +700,12 @@ impl<'a> UWordBounds<'a> {
     /// iter.next();
     /// assert_eq!(iter.as_str(), "world");
     /// ```
-    pub fn as_str(&self) -> &'a str {
-        self.string
+    pub fn as_str(&self) -> S {
+        self.string.clone()
     }
+}
 
+impl<S: StrRef> UWordBounds<S> {
     #[inline]
     fn get_next_cat(&self, idx: usize) -> Option<WordCat> {
         use crate::tables::word as wd;
@@ -718,7 +731,7 @@ impl<'a> UWordBounds<'a> {
 }
 
 #[inline]
-pub fn new_word_bounds(s: &str) -> UWordBounds<'_> {
+pub fn new_word_bounds<S: StrRef>(s: S) -> UWordBounds<S> {
     UWordBounds {
         string: s,
         cat: None,
@@ -727,7 +740,7 @@ pub fn new_word_bounds(s: &str) -> UWordBounds<'_> {
 }
 
 #[inline]
-pub fn new_word_bound_indices(s: &str) -> UWordBoundIndices<'_> {
+pub fn new_word_bound_indices<S: StrRef>(s: S) -> UWordBoundIndices<S> {
     UWordBoundIndices {
         start_offset: s.as_ptr() as usize,
         iter: new_word_bounds(s),
@@ -735,23 +748,21 @@ pub fn new_word_bound_indices(s: &str) -> UWordBoundIndices<'_> {
 }
 
 #[inline]
-fn has_alphanumeric(s: &&str) -> bool {
+fn has_alphanumeric(s: &impl StrRef) -> bool {
     use crate::tables::util::is_alphanumeric;
 
     s.chars().any(is_alphanumeric)
 }
 
 #[inline]
-pub fn new_unicode_words(s: &str) -> UnicodeWords<'_> {
-    use super::UnicodeSegmentation;
-
+pub fn new_unicode_words<S: StrRef>(s: S) -> UnicodeWords<S> {
     UnicodeWords {
-        inner: s.split_word_bounds().filter(has_alphanumeric),
+        inner: new_word_bounds(s).filter(has_alphanumeric),
     }
 }
 
 #[inline]
-pub fn new_unicode_word_indices(s: &str) -> UnicodeWordIndices<'_> {
+pub fn new_unicode_word_indices(s: &str) -> UnicodeWordIndices<&str> {
     use super::UnicodeSegmentation;
 
     UnicodeWordIndices {
