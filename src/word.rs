@@ -799,7 +799,7 @@ mod tests {
 
     #[test]
     fn test_ascii_word_indices_various_cases() {
-        let s = "Hello, world! can't e.g. var1 123,456 foo_bar example.com";
+        let s = "Hello, world! can't e.g. var1 123,456 foo_bar example.com 127.0.0.1:9090";
         let words: Vec<&str> = new_unicode_words_ascii(s).collect();
         let expected = vec![
             ("Hello"), // simple letters
@@ -810,6 +810,8 @@ mod tests {
             ("123,456"), // digits+comma+digits
             ("foo_bar"),
             ("example.com"),
+            ("127.0.0.1"),
+            ("9090"), // port number
         ];
         assert_eq!(words, expected);
     }
