@@ -9,85 +9,11 @@
 // except according to those terms.
 
 use core::cmp;
-use core::iter::Filter;
+
+extern crate alloc;
+use alloc::boxed::Box;
 
 use crate::tables::word::WordCat;
-
-/// An iterator over the substrings of a string which, after splitting the string on
-/// [word boundaries](http://www.unicode.org/reports/tr29/#Word_Boundaries),
-/// contain any characters with the
-/// [Alphabetic](http://unicode.org/reports/tr44/#Alphabetic)
-/// property, or with
-/// [General_Category=Number](http://unicode.org/reports/tr44/#General_Category_Values).
-///
-/// This struct is created by the [`unicode_words`] method on the [`UnicodeSegmentation`] trait. See
-/// its documentation for more.
-///
-/// [`unicode_words`]: trait.UnicodeSegmentation.html#tymethod.unicode_words
-/// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
-#[derive(Debug)]
-pub struct UnicodeWords<'a> {
-    inner: Filter<UWordBounds<'a>, fn(&&str) -> bool>,
-}
-
-impl<'a> Iterator for UnicodeWords<'a> {
-    type Item = &'a str;
-
-    #[inline]
-    fn next(&mut self) -> Option<&'a str> {
-        self.inner.next()
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.inner.size_hint()
-    }
-}
-impl<'a> DoubleEndedIterator for UnicodeWords<'a> {
-    #[inline]
-    fn next_back(&mut self) -> Option<&'a str> {
-        self.inner.next_back()
-    }
-}
-
-/// An iterator over the substrings of a string which, after splitting the string on
-/// [word boundaries](http://www.unicode.org/reports/tr29/#Word_Boundaries),
-/// contain any characters with the
-/// [Alphabetic](http://unicode.org/reports/tr44/#Alphabetic)
-/// property, or with
-/// [General_Category=Number](http://unicode.org/reports/tr44/#General_Category_Values).
-/// This iterator also provides the byte offsets for each substring.
-///
-/// This struct is created by the [`unicode_word_indices`] method on the [`UnicodeSegmentation`] trait. See
-/// its documentation for more.
-///
-/// [`unicode_word_indices`]: trait.UnicodeSegmentation.html#tymethod.unicode_word_indices
-/// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
-#[derive(Debug)]
-pub struct UnicodeWordIndices<'a> {
-    #[allow(clippy::type_complexity)]
-    inner: Filter<UWordBoundIndices<'a>, fn(&(usize, &str)) -> bool>,
-}
-
-impl<'a> Iterator for UnicodeWordIndices<'a> {
-    type Item = (usize, &'a str);
-
-    #[inline]
-    fn next(&mut self) -> Option<(usize, &'a str)> {
-        self.inner.next()
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.inner.size_hint()
-    }
-}
-impl<'a> DoubleEndedIterator for UnicodeWordIndices<'a> {
-    #[inline]
-    fn next_back(&mut self) -> Option<(usize, &'a str)> {
-        self.inner.next_back()
-    }
-}
 
 /// External iterator for a string's
 /// [word boundaries](http://www.unicode.org/reports/tr29/#Word_Boundaries).
@@ -115,24 +41,6 @@ pub struct UWordBounds<'a> {
 pub struct UWordBoundIndices<'a> {
     start_offset: usize,
     iter: UWordBounds<'a>,
-}
-
-impl<'a> UWordBoundIndices<'a> {
-    #[inline]
-    /// View the underlying data (the part yet to be iterated) as a slice of the original string.
-    ///
-    /// ```rust
-    /// # use unicode_segmentation::UnicodeSegmentation;
-    /// let mut iter = "Hello world".split_word_bound_indices();
-    /// assert_eq!(iter.as_str(), "Hello world");
-    /// iter.next();
-    /// assert_eq!(iter.as_str(), " world");
-    /// iter.next();
-    /// assert_eq!(iter.as_str(), "world");
-    /// ```
-    pub fn as_str(&self) -> &'a str {
-        self.iter.as_str()
-    }
 }
 
 impl<'a> Iterator for UWordBoundIndices<'a> {
@@ -678,22 +586,6 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
 
 impl<'a> UWordBounds<'a> {
     #[inline]
-    /// View the underlying data (the part yet to be iterated) as a slice of the original string.
-    ///
-    /// ```rust
-    /// # use unicode_segmentation::UnicodeSegmentation;
-    /// let mut iter = "Hello world".split_word_bounds();
-    /// assert_eq!(iter.as_str(), "Hello world");
-    /// iter.next();
-    /// assert_eq!(iter.as_str(), " world");
-    /// iter.next();
-    /// assert_eq!(iter.as_str(), "world");
-    /// ```
-    pub fn as_str(&self) -> &'a str {
-        self.string
-    }
-
-    #[inline]
     fn get_next_cat(&self, idx: usize) -> Option<WordCat> {
         use crate::tables::word as wd;
         let nidx = idx + self.string[idx..].chars().next().unwrap().len_utf8();
@@ -736,33 +628,161 @@ pub fn new_word_bound_indices(s: &str) -> UWordBoundIndices<'_> {
 
 #[inline]
 fn has_alphanumeric(s: &&str) -> bool {
-    use crate::tables::util::is_alphanumeric;
-
-    s.chars().any(is_alphanumeric)
+    s.chars().any(|c| c.is_alphanumeric())
 }
 
 #[inline]
-pub fn new_unicode_words(s: &str) -> UnicodeWords<'_> {
-    use super::UnicodeSegmentation;
+fn has_ascii_alphanumeric(s: &&str) -> bool {
+    s.bytes().any(|b| b.is_ascii_alphanumeric())
+}
 
-    UnicodeWords {
-        inner: s.split_word_bounds().filter(has_alphanumeric),
+/// Fast-path for ASCII-only word segmentation, matching `unicode-segmentation` on pure ASCII:
+/// • runs of ASCII spaces are grouped (`"   "`)  
+/// • core-runs (letters, digits, underscore + infix)  
+/// • any other ASCII char emits as one token, except CR+LF emits as a single two-char token
+pub fn new_ascii_word_bound_indices<'a>(s: &'a str) -> impl Iterator<Item = (usize, &'a str)> + 'a {
+    #[inline(always)]
+    fn is_core(b: u8) -> bool {
+        b.is_ascii_alphanumeric() || b == b'_'
+    }
+    #[inline(always)]
+    fn is_infix(b: u8, prev: u8, next: u8) -> bool {
+        match b {
+            // numeric separators
+            b'.' | b',' | b';' | b'\'' if prev.is_ascii_digit() && next.is_ascii_digit() => true,
+            // apostrophe in contractions
+            b'\'' if prev.is_ascii_alphabetic() && next.is_ascii_alphabetic() => true,
+            // dot/colon inside letters
+            b'.' | b':' if prev.is_ascii_alphabetic() && next.is_ascii_alphabetic() => true,
+            _ => false,
+        }
+    }
+
+    use core::iter::from_fn;
+    let mut rest = s;
+    let mut offset = 0;
+
+    from_fn(move || {
+        if rest.is_empty() {
+            return None;
+        }
+        let bytes = rest.as_bytes();
+        let len = bytes.len();
+
+        // 1) Group runs of spaces
+        if bytes[0] == b' ' {
+            let mut i = 1;
+            while i < len && bytes[i] == b' ' {
+                i += 1;
+            }
+            let word = &rest[..i];
+            let pos = offset;
+            rest = &rest[i..];
+            offset += i;
+            return Some((pos, word));
+        }
+
+        // 2) Core-run (letters/digits/underscore + infix)
+        if is_core(bytes[0]) {
+            let mut i = 1;
+            while i < len {
+                let b = bytes[i];
+                if is_core(b) || (i + 1 < len && is_infix(b, bytes[i - 1], bytes[i + 1])) {
+                    i += 1;
+                } else {
+                    break;
+                }
+            }
+            let word = &rest[..i];
+            let pos = offset;
+            rest = &rest[i..];
+            offset += i;
+            return Some((pos, word));
+        }
+
+        // 3) Non-core: CR+LF as one token, otherwise single char
+        if bytes[0] == b'\r' && len >= 2 && bytes[1] == b'\n' {
+            let word = &rest[..2];
+            let pos = offset;
+            rest = &rest[2..];
+            offset += 2;
+            Some((pos, word))
+        } else {
+            // emit exactly one byte (whitespace/control/punct)
+            let word = &rest[..1];
+            let pos = offset;
+            rest = &rest[1..];
+            offset += 1;
+            Some((pos, word))
+        }
+    })
+}
+/// An iterator over the substrings of a string which, after splitting the string on
+/// [word boundaries](http://www.unicode.org/reports/tr29/#Word_Boundaries),
+/// contain any characters with the
+/// [Alphabetic](http://unicode.org/reports/tr44/#Alphabetic)
+/// property, or with
+/// [General_Category=Number](http://unicode.org/reports/tr44/#General_Category_Values).
+///
+/// This method is accessed by the [`unicode_words`] method on the [`UnicodeSegmentation`] trait. See
+/// its documentation for more.
+///
+/// [`unicode_words`]: trait.UnicodeSegmentation.html#tymethod.unicode_words
+/// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
+#[inline]
+pub(crate) fn new_unicode_words(s: &str) -> Box<dyn Iterator<Item = &str> + '_> {
+    if s.is_ascii() {
+        Box::new(new_unicode_words_ascii(s))
+    } else {
+        Box::new(new_unicode_words_general(s))
     }
 }
 
 #[inline]
-pub fn new_unicode_word_indices(s: &str) -> UnicodeWordIndices<'_> {
-    use super::UnicodeSegmentation;
+fn new_unicode_words_ascii<'a>(s: &'a str) -> impl Iterator<Item = &'a str> + 'a {
+    new_ascii_word_bound_indices(s)
+        .map(|(_, w)| w)
+        .filter(|w| w.chars().any(|c| c.is_ascii_alphanumeric()))
+}
 
-    UnicodeWordIndices {
-        inner: s
-            .split_word_bound_indices()
-            .filter(|(_, c)| has_alphanumeric(c)),
+#[inline]
+fn new_unicode_words_general<'a>(s: &'a str) -> impl Iterator<Item = &'a str> + 'a {
+    new_word_bounds(s).filter(has_alphanumeric)
+}
+
+/// An iterator over the substrings of a string which, after splitting the string on
+/// [word boundaries](http://www.unicode.org/reports/tr29/#Word_Boundaries),
+/// contain any characters with the
+/// [Alphabetic](http://unicode.org/reports/tr44/#Alphabetic)
+/// property, or with
+/// [General_Category=Number](http://unicode.org/reports/tr44/#General_Category_Values).
+/// This iterator also provides the byte offsets for each substring.
+///
+/// This method is accessed by the [`unicode_word_indices`] method on the [`UnicodeSegmentation`] trait. See
+/// its documentation for more.
+///
+/// [`unicode_word_indices`]: trait.UnicodeSegmentation.html#tymethod.unicode_word_indices
+/// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
+#[inline]
+pub fn new_unicode_word_indices<'a>(s: &'a str) -> Box<dyn Iterator<Item = (usize, &'a str)> + 'a> {
+    if s.is_ascii() {
+        Box::new(new_ascii_word_bound_indices(s).filter(|(_, w)| has_ascii_alphanumeric(w)))
+    } else {
+        Box::new(new_word_bound_indices(s).filter(|(_, w)| has_alphanumeric(w)))
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::word::{
+        new_ascii_word_bound_indices, new_unicode_words_ascii, new_word_bound_indices,
+    };
+    use std::string::String;
+    use std::vec::Vec;
+    use std::{format, vec};
+
+    use proptest::prelude::*;
+
     #[test]
     fn test_syriac_abbr_mark() {
         use crate::tables::word as wd;
@@ -775,5 +795,43 @@ mod tests {
         use crate::tables::word as wd;
         let (_, _, cat) = wd::word_category('\u{6dd}');
         assert_eq!(cat, wd::WC_Numeric);
+    }
+
+    #[test]
+    fn test_ascii_word_indices_various_cases() {
+        let s = "Hello, world! can't e.g. var1 123,456 foo_bar example.com";
+        let words: Vec<&str> = new_unicode_words_ascii(s).collect();
+        let expected = vec![
+            ("Hello"), // simple letters
+            ("world"), // skip comma+space, stop at '!'
+            ("can't"), // apostrophe joins letters
+            ("e.g"),
+            ("var1"),
+            ("123,456"), // digits+comma+digits
+            ("foo_bar"),
+            ("example.com"),
+        ];
+        assert_eq!(words, expected);
+    }
+
+    /// Strategy that yields every code-point from NUL (0) to DEL (127).
+    fn ascii_char() -> impl Strategy<Value = char> {
+        (0u8..=127).prop_map(|b| b as char)
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(10000))]
+        /// Fast path must equal general path for any ASCII input.
+        #[test]
+        fn proptest_ascii_matches_unicode_word_indices(
+            // Vec<char> → String, length 0‒99
+            s in proptest::collection::vec(ascii_char(), 0..100)
+                   .prop_map(|v| v.into_iter().collect::<String>())
+        ) {
+            let fast: Vec<(usize, &str)> = new_ascii_word_bound_indices(&s).collect();
+            let uni:  Vec<(usize, &str)> = new_word_bound_indices(&s).collect();
+
+            prop_assert_eq!(fast, uni);
+        }
     }
 }

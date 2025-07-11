@@ -56,11 +56,14 @@
 )]
 #![no_std]
 
+#[cfg(test)]
+extern crate std;
+
 pub use grapheme::{GraphemeCursor, GraphemeIncomplete};
 pub use grapheme::{GraphemeIndices, Graphemes};
 pub use sentence::{USentenceBoundIndices, USentenceBounds, UnicodeSentences};
 pub use tables::UNICODE_VERSION;
-pub use word::{UWordBoundIndices, UWordBounds, UnicodeWordIndices, UnicodeWords};
+pub use word::{UWordBoundIndices, UWordBounds};
 
 mod grapheme;
 mod sentence;
@@ -133,7 +136,7 @@ pub trait UnicodeSegmentation {
     ///
     /// assert_eq!(&uw1[..], b);
     /// ```
-    fn unicode_words(&self) -> UnicodeWords<'_>;
+    fn unicode_words(&self) -> impl Iterator<Item = &'_ str>;
 
     /// Returns an iterator over the words of `self`, separated on
     /// [UAX#29 word boundaries](http://www.unicode.org/reports/tr29/#Word_Boundaries), and their
@@ -157,7 +160,7 @@ pub trait UnicodeSegmentation {
     ///
     /// assert_eq!(&uwi1[..], b);
     /// ```
-    fn unicode_word_indices(&self) -> UnicodeWordIndices<'_>;
+    fn unicode_word_indices(&self) -> impl Iterator<Item = (usize, &'_ str)>;
 
     /// Returns an iterator over substrings of `self` separated on
     /// [UAX#29 word boundaries](http://www.unicode.org/reports/tr29/#Word_Boundaries).
@@ -173,7 +176,7 @@ pub trait UnicodeSegmentation {
     ///
     /// assert_eq!(&swu1[..], b);
     /// ```
-    fn split_word_bounds(&self) -> UWordBounds<'_>;
+    fn split_word_bounds(&self) -> impl DoubleEndedIterator<Item = &'_ str>;
 
     /// Returns an iterator over substrings of `self`, split on UAX#29 word boundaries,
     /// and their offsets. See `split_word_bounds()` for more information.
@@ -188,7 +191,7 @@ pub trait UnicodeSegmentation {
     ///
     /// assert_eq!(&swi1[..], b);
     /// ```
-    fn split_word_bound_indices(&self) -> UWordBoundIndices<'_>;
+    fn split_word_bound_indices(&self) -> impl DoubleEndedIterator<Item = (usize, &'_ str)>;
 
     /// Returns an iterator over substrings of `self` separated on
     /// [UAX#29 sentence boundaries](http://www.unicode.org/reports/tr29/#Sentence_Boundaries).
@@ -210,7 +213,7 @@ pub trait UnicodeSegmentation {
     ///
     /// assert_eq!(&us1[..], b);
     /// ```
-    fn unicode_sentences(&self) -> UnicodeSentences<'_>;
+    fn unicode_sentences(&self) -> impl Iterator<Item = &'_ str>;
 
     /// Returns an iterator over substrings of `self` separated on
     /// [UAX#29 sentence boundaries](http://www.unicode.org/reports/tr29/#Sentence_Boundaries).
@@ -258,27 +261,27 @@ impl UnicodeSegmentation for str {
     }
 
     #[inline]
-    fn unicode_words(&self) -> UnicodeWords {
+    fn unicode_words(&self) -> impl Iterator<Item = &'_ str> {
         word::new_unicode_words(self)
     }
 
     #[inline]
-    fn unicode_word_indices(&self) -> UnicodeWordIndices {
+    fn unicode_word_indices(&self) -> impl Iterator<Item = (usize, &'_ str)> {
         word::new_unicode_word_indices(self)
     }
 
     #[inline]
-    fn split_word_bounds(&self) -> UWordBounds {
+    fn split_word_bounds(&self) -> impl DoubleEndedIterator<Item = &'_ str> {
         word::new_word_bounds(self)
     }
 
     #[inline]
-    fn split_word_bound_indices(&self) -> UWordBoundIndices {
+    fn split_word_bound_indices(&self) -> impl DoubleEndedIterator<Item = (usize, &'_ str)> {
         word::new_word_bound_indices(self)
     }
 
     #[inline]
-    fn unicode_sentences(&self) -> UnicodeSentences {
+    fn unicode_sentences(&self) -> impl Iterator<Item = &'_ str> {
         sentence::new_unicode_sentences(self)
     }
 
