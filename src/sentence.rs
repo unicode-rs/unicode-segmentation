@@ -345,10 +345,9 @@ pub fn new_sentence_bound_indices(source: &str) -> USentenceBoundIndices<'_> {
 #[inline]
 pub fn new_unicode_sentences(s: &str) -> UnicodeSentences<'_> {
     use super::UnicodeSegmentation;
-    use crate::tables::util::is_alphanumeric;
 
     fn has_alphanumeric(s: &&str) -> bool {
-        s.chars().any(is_alphanumeric)
+        s.chars().any(|c| c.is_alphanumeric())
     }
     let has_alphanumeric: fn(&&str) -> bool = has_alphanumeric; // coerce to fn pointer
 

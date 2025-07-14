@@ -736,9 +736,7 @@ pub fn new_word_bound_indices(s: &str) -> UWordBoundIndices<'_> {
 
 #[inline]
 fn has_alphanumeric(s: &&str) -> bool {
-    use crate::tables::util::is_alphanumeric;
-
-    s.chars().any(is_alphanumeric)
+    s.chars().any(|c| c.is_alphanumeric())
 }
 
 #[inline]

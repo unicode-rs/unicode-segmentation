@@ -74,42 +74,6 @@ def fetch(f):
         sys.stderr.write("cannot load %s" % f)
         exit(1)
 
-def load_gencats(f):
-    fetch(f)
-    gencats = {}
-
-    udict = {};
-    range_start = -1;
-    for line in fileinput.input(f):
-        data = line.split(';');
-        if len(data) != 15:
-            continue
-        cp = int(data[0], 16);
-        if is_surrogate(cp):
-            continue
-        if range_start >= 0:
-            for i in range(range_start, cp):
-                udict[i] = data;
-            range_start = -1;
-        if data[1].endswith(", First>"):
-            range_start = cp;
-            continue;
-        udict[cp] = data;
-
-    for code in udict:
-        [code_org, name, gencat, combine, bidi,
-         decomp, deci, digit, num, mirror,
-         old, iso, upcase, lowcase, titlecase ] = udict[code];
-
-        # place letter in categories as appropriate
-        for cat in [gencat, "Assigned"] + expanded_categories.get(gencat, []):
-            if cat not in gencats:
-                gencats[cat] = []
-            gencats[cat].append(code)
-
-    gencats = group_cats(gencats)
-    return gencats
-
 def group_cats(cats):
     cats_out = {}
     for cat in cats:
@@ -230,36 +194,6 @@ pub mod util {
         }).is_ok()
     }
 
-    #[inline]
-    fn is_alphabetic(c: char) -> bool {
-        if super::UNICODE_VERSION_U8 == char::UNICODE_VERSION {
-            c.is_alphabetic()
-        } else {
-            match c {
-                'a' ..= 'z' | 'A' ..= 'Z' => true,
-                c if c > '\\x7f' => super::derived_property::Alphabetic(c),
-                _ => false,
-            }
-        }
-    }
-
-    #[inline]
-    fn is_numeric(c: char) -> bool {
-        if super::UNICODE_VERSION_U8 == char::UNICODE_VERSION {
-            c.is_numeric()
-        } else {
-            match c {
-                '0' ..= '9' => true,
-                c if c > '\\x7f' => super::general_category::N(c),
-                _ => false,
-            }
-        }
-    }
-
-    #[inline]
-    pub fn is_alphanumeric(c: char) -> bool {
-        is_alphabetic(c) || is_numeric(c)
-    }
 }
 
 """)
@@ -398,18 +332,11 @@ if __name__ == "__main__":
 pub const UNICODE_VERSION: (u64, u64, u64) = (%s, %s, %s);
 """ % UNICODE_VERSION)
 
-        rf.write("""
-const UNICODE_VERSION_U8: (u8, u8, u8) = (%s, %s, %s);
-""" % UNICODE_VERSION)
-
         # download and parse all the data
-        gencats = load_gencats("UnicodeData.txt")
-        derived = load_properties("DerivedCoreProperties.txt", ["Alphabetic", ("InCB", "Consonant"), ("InCB", "Extend"), ("InCB", "Linker")])
+        derived = load_properties("DerivedCoreProperties.txt", [("InCB", "Consonant"), ("InCB", "Extend"), ("InCB", "Linker")])
 
         emit_util_mod(rf)
-        for (name, cat, pfuns) in ("general_category", gencats, ["N"]), \
-                                  ("derived_property", derived, ["Alphabetic", ("InCB", "Extend")]):
-            emit_property_module(rf, name, cat, pfuns)
+        emit_property_module(rf, "derived_property", derived, [("InCB", "Extend")])
 
         rf.write("""pub fn is_incb_linker(c: char) -> bool {
     matches!(c,""")
