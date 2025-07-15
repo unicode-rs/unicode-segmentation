@@ -11,7 +11,6 @@
 extern crate alloc;
 use alloc::boxed::Box;
 use core::cmp;
-use core::iter::Filter;
 
 use crate::tables::word::WordCat;
 
@@ -28,7 +27,7 @@ use crate::tables::word::WordCat;
 /// [`unicode_words`]: trait.UnicodeSegmentation.html#tymethod.unicode_words
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
 pub struct UnicodeWords<'a> {
-    inner: Box<dyn Iterator<Item = &'a str> + 'a>,
+    inner: Box<dyn DoubleEndedIterator<Item = &'a str> + 'a>,
 }
 
 impl<'a> Iterator for UnicodeWords<'a> {
@@ -45,6 +44,13 @@ impl<'a> Iterator for UnicodeWords<'a> {
     }
 }
 
+impl<'a> DoubleEndedIterator for UnicodeWords<'a> {
+    #[inline]
+    fn next_back(&mut self) -> Option<&'a str> {
+        self.inner.next_back()
+    }
+}
+
 /// An iterator over the substrings of a string which, after splitting the string on
 /// [word boundaries](http://www.unicode.org/reports/tr29/#Word_Boundaries),
 /// contain any characters with the
@@ -58,16 +64,15 @@ impl<'a> Iterator for UnicodeWords<'a> {
 ///
 /// [`unicode_word_indices`]: trait.UnicodeSegmentation.html#tymethod.unicode_word_indices
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
-#[derive(Debug)]
 pub struct UnicodeWordIndices<'a> {
     #[allow(clippy::type_complexity)]
-    inner: Filter<UWordBoundIndices<'a>, fn(&(usize, &str)) -> bool>,
+    inner: Box<dyn DoubleEndedIterator<Item = (usize, &'a str)> + 'a>,
 }
 
 impl<'a> Iterator for UnicodeWordIndices<'a> {
     type Item = (usize, &'a str);
 
-    #[inline]
+    #[inline(always)]
     fn next(&mut self) -> Option<(usize, &'a str)> {
         self.inner.next()
     }
@@ -722,12 +727,12 @@ impl<'a> AsciiWordBoundIter<'a> {
         AsciiWordBoundIter { rest: s, offset: 0 }
     }
 
-    #[inline(always)]
+    #[inline]
     fn is_core(b: u8) -> bool {
         b.is_ascii_alphanumeric() || b == b'_'
     }
 
-    #[inline(always)]
+    #[inline]
     fn is_infix(b: u8, prev: u8, next: u8) -> bool {
         match b {
             // numeric separators
@@ -744,6 +749,7 @@ impl<'a> AsciiWordBoundIter<'a> {
 impl<'a> Iterator for AsciiWordBoundIter<'a> {
     type Item = (usize, &'a str);
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.rest.is_empty() {
             return None;
@@ -802,6 +808,66 @@ impl<'a> Iterator for AsciiWordBoundIter<'a> {
     }
 }
 
+impl<'a> DoubleEndedIterator for AsciiWordBoundIter<'a> {
+    fn next_back(&mut self) -> Option<(usize, &'a str)> {
+        let rest = self.rest;
+        if rest.is_empty() {
+            return None;
+        }
+        let bytes = rest.as_bytes();
+        let len = bytes.len();
+
+        // 1) Trailing spaces
+        if bytes[len - 1] == b' ' {
+            // find start of this last run of spaces
+            let mut start = len - 1;
+            while start > 0 && bytes[start - 1] == b' ' {
+                start -= 1;
+            }
+            let word = &rest[start..];
+            let pos = self.offset + start;
+            self.rest = &rest[..start];
+            return Some((pos, word));
+        }
+
+        // 2) Trailing core-run (letters/digits/underscore + infix)
+        if Self::is_core(bytes[len - 1]) {
+            // scan backwards as long as we see `is_core` or an `is_infix`
+            let mut start = len - 1;
+            while start > 0 {
+                let b = bytes[start - 1];
+                let prev = if start >= 2 { bytes[start - 2] } else { b };
+                let next = bytes[start]; // the byte we just included
+                if Self::is_core(b) || Self::is_infix(b, prev, next) {
+                    start -= 1;
+                } else {
+                    break;
+                }
+            }
+            let word = &rest[start..];
+            let pos = self.offset + start;
+            self.rest = &rest[..start];
+            return Some((pos, word));
+        }
+
+        // 3) CR+LF at end
+        if len >= 2 && bytes[len - 2] == b'\r' && bytes[len - 1] == b'\n' {
+            let start = len - 2;
+            let word = &rest[start..];
+            let pos = self.offset + start;
+            self.rest = &rest[..start];
+            return Some((pos, word));
+        }
+
+        // 4) Single non-core byte
+        let start = len - 1;
+        let word = &rest[start..];
+        let pos = self.offset + start;
+        self.rest = &rest[..start];
+        Some((pos, word))
+    }
+}
+
 #[inline]
 pub fn new_word_bounds(s: &str) -> UWordBounds<'_> {
     UWordBounds {
@@ -832,20 +898,25 @@ fn has_alphanumeric(s: &&str) -> bool {
 }
 
 #[inline]
-fn new_unicode_words_ascii<'a>(s: &'a str) -> impl Iterator<Item = &'a str> + 'a {
-    new_ascii_word_bound_indices(s)
-        .map(|(_, w)| w)
-        .filter(|w| w.chars().any(|c| c.is_ascii_alphanumeric()))
+fn has_ascii_alphanumeric(s: &&str) -> bool {
+    s.chars().any(|c| c.is_ascii_alphanumeric())
 }
 
 #[inline]
-fn new_unicode_words_general<'a>(s: &'a str) -> impl Iterator<Item = &'a str> + 'a {
+fn new_unicode_words_ascii<'a>(s: &'a str) -> impl DoubleEndedIterator<Item = &'a str> + 'a {
+    new_ascii_word_bound_indices(s)
+        .map(|(_, w)| w)
+        .filter(has_ascii_alphanumeric)
+}
+
+#[inline]
+fn new_unicode_words_general<'a>(s: &'a str) -> impl DoubleEndedIterator<Item = &'a str> + 'a {
     new_word_bounds(s).filter(has_alphanumeric)
 }
 
 #[inline]
 pub fn new_unicode_words(s: &str) -> UnicodeWords<'_> {
-    let iter: Box<dyn Iterator<Item = &str>> = if s.is_ascii() {
+    let iter: Box<dyn DoubleEndedIterator<Item = &str>> = if s.is_ascii() {
         Box::new(new_unicode_words_ascii(s))
     } else {
         Box::new(new_unicode_words_general(s))
@@ -855,14 +926,13 @@ pub fn new_unicode_words(s: &str) -> UnicodeWords<'_> {
 }
 
 #[inline]
-pub fn new_unicode_word_indices(s: &str) -> UnicodeWordIndices<'_> {
-    use super::UnicodeSegmentation;
-
-    UnicodeWordIndices {
-        inner: s
-            .split_word_bound_indices()
-            .filter(|(_, c)| has_alphanumeric(c)),
-    }
+pub fn new_unicode_word_indices<'a>(s: &'a str) -> UnicodeWordIndices<'a> {
+    let iter: Box<dyn DoubleEndedIterator<Item = (usize, &str)>> = if s.is_ascii() {
+        Box::new(new_ascii_word_bound_indices(s).filter(|(_, w)| has_ascii_alphanumeric(w)))
+    } else {
+        Box::new(new_word_bound_indices(s).filter(|(_, w)| has_alphanumeric(w)))
+    };
+    UnicodeWordIndices { inner: iter }
 }
 
 #[cfg(test)]
@@ -920,6 +990,18 @@ mod tests {
             let uni:  Vec<(usize, &str)> = new_word_bound_indices(&s).collect();
 
             prop_assert_eq!(fast, uni);
+        }
+
+        /// Fast path must equal general path for any ASCII input, forwards and backwards.
+        #[test]
+        fn proptest_ascii_matches_unicode_word_indices_rev(
+            // Vec<char> → String, length 0‒99
+            s in proptest::collection::vec(ascii_char(), 0..100)
+                   .prop_map(|v| v.into_iter().collect::<String>())
+        ) {
+            let fast_rev: Vec<(usize, &str)> = new_ascii_word_bound_indices(&s).rev().collect();
+            let uni_rev : Vec<(usize, &str)> = new_word_bound_indices(&s).rev().collect();
+            prop_assert_eq!(fast_rev, uni_rev);
         }
     }
 }
