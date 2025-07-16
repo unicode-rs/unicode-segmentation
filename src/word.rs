@@ -9,7 +9,6 @@
 // except according to those terms.
 
 extern crate alloc;
-use alloc::boxed::Box;
 use core::cmp;
 
 use crate::tables::word::WordCat;
@@ -27,27 +26,33 @@ use crate::tables::word::WordCat;
 /// [`unicode_words`]: trait.UnicodeSegmentation.html#tymethod.unicode_words
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
 pub struct UnicodeWords<'a> {
-    inner: Box<dyn DoubleEndedIterator<Item = &'a str> + 'a>,
+    inner: WordsIter<'a>,
 }
 
 impl<'a> Iterator for UnicodeWords<'a> {
     type Item = &'a str;
-
     #[inline]
-    fn next(&mut self) -> Option<&'a str> {
-        self.inner.next()
+    fn next(&mut self) -> Option<Self::Item> {
+        match &mut self.inner {
+            WordsIter::Ascii(i) => i.next(),
+            WordsIter::Unicode(i) => i.next(),
+        }
     }
-
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        self.inner.size_hint()
+        match &self.inner {
+            WordsIter::Ascii(i) => i.size_hint(),
+            WordsIter::Unicode(i) => i.size_hint(),
+        }
     }
 }
-
 impl<'a> DoubleEndedIterator for UnicodeWords<'a> {
     #[inline]
-    fn next_back(&mut self) -> Option<&'a str> {
-        self.inner.next_back()
+    fn next_back(&mut self) -> Option<Self::Item> {
+        match &mut self.inner {
+            WordsIter::Ascii(i) => i.next_back(),
+            WordsIter::Unicode(i) => i.next_back(),
+        }
     }
 }
 
@@ -65,27 +70,33 @@ impl<'a> DoubleEndedIterator for UnicodeWords<'a> {
 /// [`unicode_word_indices`]: trait.UnicodeSegmentation.html#tymethod.unicode_word_indices
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
 pub struct UnicodeWordIndices<'a> {
-    #[allow(clippy::type_complexity)]
-    inner: Box<dyn DoubleEndedIterator<Item = (usize, &'a str)> + 'a>,
+    inner: IndicesIter<'a>,
 }
 
 impl<'a> Iterator for UnicodeWordIndices<'a> {
     type Item = (usize, &'a str);
-
-    #[inline(always)]
-    fn next(&mut self) -> Option<(usize, &'a str)> {
-        self.inner.next()
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        match &mut self.inner {
+            IndicesIter::Ascii(i) => i.next(),
+            IndicesIter::Unicode(i) => i.next(),
+        }
     }
-
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        self.inner.size_hint()
+        match &self.inner {
+            IndicesIter::Ascii(i) => i.size_hint(),
+            IndicesIter::Unicode(i) => i.size_hint(),
+        }
     }
 }
 impl<'a> DoubleEndedIterator for UnicodeWordIndices<'a> {
     #[inline]
-    fn next_back(&mut self) -> Option<(usize, &'a str)> {
-        self.inner.next_back()
+    fn next_back(&mut self) -> Option<Self::Item> {
+        match &mut self.inner {
+            IndicesIter::Ascii(i) => i.next_back(),
+            IndicesIter::Unicode(i) => i.next_back(),
+        }
     }
 }
 
@@ -869,6 +880,58 @@ impl<'a> DoubleEndedIterator for AsciiWordBoundIter<'a> {
 }
 
 #[inline]
+fn ascii_word_ok(t: &(usize, &str)) -> bool {
+    has_ascii_alphanumeric(&t.1)
+}
+#[inline]
+fn unicode_word_ok(t: &(usize, &str)) -> bool {
+    has_alphanumeric(&t.1)
+}
+
+type AsciiWordsIter<'a> = core::iter::Filter<
+    core::iter::Map<AsciiWordBoundIter<'a>, fn((usize, &'a str)) -> &'a str>,
+    fn(&&'a str) -> bool,
+>;
+
+type UnicodeWordsIter<'a> = core::iter::Filter<UWordBounds<'a>, fn(&&'a str) -> bool>;
+
+type AsciiIndicesIter<'a> =
+    core::iter::Filter<AsciiWordBoundIter<'a>, fn(&(usize, &'a str)) -> bool>;
+
+type UnicodeIndicesIter<'a> =
+    core::iter::Filter<UWordBoundIndices<'a>, fn(&(usize, &'a str)) -> bool>;
+
+enum WordsIter<'a> {
+    Ascii(AsciiWordsIter<'a>),
+    Unicode(UnicodeWordsIter<'a>),
+}
+
+enum IndicesIter<'a> {
+    Ascii(AsciiIndicesIter<'a>),
+    Unicode(UnicodeIndicesIter<'a>),
+}
+
+#[inline]
+pub fn new_unicode_words(s: &str) -> UnicodeWords<'_> {
+    let inner = if s.is_ascii() {
+        WordsIter::Ascii(new_unicode_words_ascii(s))
+    } else {
+        WordsIter::Unicode(new_unicode_words_general(s))
+    };
+    UnicodeWords { inner }
+}
+
+#[inline]
+pub fn new_unicode_word_indices(s: &str) -> UnicodeWordIndices<'_> {
+    let inner = if s.is_ascii() {
+        IndicesIter::Ascii(new_ascii_word_bound_indices(s).filter(ascii_word_ok))
+    } else {
+        IndicesIter::Unicode(new_word_bound_indices(s).filter(unicode_word_ok))
+    };
+    UnicodeWordIndices { inner }
+}
+
+#[inline]
 pub fn new_word_bounds(s: &str) -> UWordBounds<'_> {
     UWordBounds {
         string: s,
@@ -902,37 +965,21 @@ fn has_ascii_alphanumeric(s: &&str) -> bool {
     s.chars().any(|c| c.is_ascii_alphanumeric())
 }
 
+#[inline(always)]
+fn strip_pos((_, w): (usize, &str)) -> &str {
+    w
+}
+
 #[inline]
-fn new_unicode_words_ascii<'a>(s: &'a str) -> impl DoubleEndedIterator<Item = &'a str> + 'a {
+fn new_unicode_words_ascii<'a>(s: &'a str) -> AsciiWordsIter<'a> {
     new_ascii_word_bound_indices(s)
-        .map(|(_, w)| w)
+        .map(strip_pos as fn(_) -> _)
         .filter(has_ascii_alphanumeric)
 }
 
 #[inline]
-fn new_unicode_words_general<'a>(s: &'a str) -> impl DoubleEndedIterator<Item = &'a str> + 'a {
+fn new_unicode_words_general<'a>(s: &'a str) -> UnicodeWordsIter<'a> {
     new_word_bounds(s).filter(has_alphanumeric)
-}
-
-#[inline]
-pub fn new_unicode_words(s: &str) -> UnicodeWords<'_> {
-    let iter: Box<dyn DoubleEndedIterator<Item = &str>> = if s.is_ascii() {
-        Box::new(new_unicode_words_ascii(s))
-    } else {
-        Box::new(new_unicode_words_general(s))
-    };
-
-    UnicodeWords { inner: iter }
-}
-
-#[inline]
-pub fn new_unicode_word_indices<'a>(s: &'a str) -> UnicodeWordIndices<'a> {
-    let iter: Box<dyn DoubleEndedIterator<Item = (usize, &str)>> = if s.is_ascii() {
-        Box::new(new_ascii_word_bound_indices(s).filter(|(_, w)| has_ascii_alphanumeric(w)))
-    } else {
-        Box::new(new_word_bound_indices(s).filter(|(_, w)| has_alphanumeric(w)))
-    };
-    UnicodeWordIndices { inner: iter }
 }
 
 #[cfg(test)]
