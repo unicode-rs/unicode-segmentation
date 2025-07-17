@@ -9,6 +9,7 @@
 // except according to those terms.
 
 use core::cmp;
+use core::iter::Filter;
 
 use crate::tables::word::WordCat;
 
@@ -929,18 +930,13 @@ fn unicode_word_ok(t: &(usize, &str)) -> bool {
     has_alphanumeric(&t.1)
 }
 
-type AsciiWordsIter<'a> = core::iter::Filter<
+type AsciiWordsIter<'a> = Filter<
     core::iter::Map<AsciiWordBoundIter<'a>, fn((usize, &'a str)) -> &'a str>,
     fn(&&'a str) -> bool,
 >;
-
-type UnicodeWordsIter<'a> = core::iter::Filter<UWordBounds<'a>, fn(&&'a str) -> bool>;
-
-type AsciiIndicesIter<'a> =
-    core::iter::Filter<AsciiWordBoundIter<'a>, fn(&(usize, &'a str)) -> bool>;
-
-type UnicodeIndicesIter<'a> =
-    core::iter::Filter<UWordBoundIndices<'a>, fn(&(usize, &'a str)) -> bool>;
+type UnicodeWordsIter<'a> = Filter<UWordBounds<'a>, fn(&&'a str) -> bool>;
+type AsciiIndicesIter<'a> = Filter<AsciiWordBoundIter<'a>, fn(&(usize, &'a str)) -> bool>;
+type UnicodeIndicesIter<'a> = Filter<UWordBoundIndices<'a>, fn(&(usize, &'a str)) -> bool>;
 
 #[derive(Debug)]
 enum WordsIter<'a> {
