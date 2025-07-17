@@ -24,6 +24,7 @@ use crate::tables::word::WordCat;
 ///
 /// [`unicode_words`]: trait.UnicodeSegmentation.html#tymethod.unicode_words
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
+#[derive(Debug)]
 pub struct UnicodeWords<'a> {
     inner: WordsIter<'a>,
 }
@@ -68,6 +69,7 @@ impl<'a> DoubleEndedIterator for UnicodeWords<'a> {
 ///
 /// [`unicode_word_indices`]: trait.UnicodeSegmentation.html#tymethod.unicode_word_indices
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
+#[derive(Debug)]
 pub struct UnicodeWordIndices<'a> {
     inner: IndicesIter<'a>,
 }
@@ -752,6 +754,7 @@ impl<'a> UWordBounds<'a> {
 /// AHLetter is the same as ALetter, so we don't need to distinguish it.
 ///
 /// Any other single ASCII byte is its own boundary (the default WB999).
+#[derive(Debug)]
 pub struct AsciiWordBoundIter<'a> {
     rest: &'a str,
     offset: usize,
@@ -939,11 +942,13 @@ type AsciiIndicesIter<'a> =
 type UnicodeIndicesIter<'a> =
     core::iter::Filter<UWordBoundIndices<'a>, fn(&(usize, &'a str)) -> bool>;
 
+#[derive(Debug)]
 enum WordsIter<'a> {
     Ascii(AsciiWordsIter<'a>),
     Unicode(UnicodeWordsIter<'a>),
 }
 
+#[derive(Debug)]
 enum IndicesIter<'a> {
     Ascii(AsciiIndicesIter<'a>),
     Unicode(UnicodeIndicesIter<'a>),
