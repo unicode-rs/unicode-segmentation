@@ -728,6 +728,31 @@ impl<'a> UWordBounds<'a> {
     }
 }
 
+/// ASCII‑fast‑path word‑boundary iterator for strings that contain only ASCII characters.
+///
+/// Since we handle only ASCII characters, we can use a much simpler set of
+/// word break values than the full Unicode algorithm.
+/// https://www.unicode.org/reports/tr29/#Table_Word_Break_Property_Values
+///
+/// | Word_Break value | ASCII code points that belong to it                             |
+/// | -----------------| --------------------------------------------------------------- |
+/// | CR               | U+000D (CR)                                                     |
+/// | LF               | U+000A (LF)                                                     |
+/// | Newline          | U+000B (VT), U+000C (FF)                                        |
+/// | Single_Quote     | U+0027 (')                                                      |
+/// | Double_Quote     | U+0022 (")                                                      |
+/// | MidNumLet        | U+002E (.) FULL STOP                                            |
+/// | MidLetter        | U+003A (:) COLON                                                |
+/// | MidNum           | U+002C (,), U+003B (;)                                          |
+/// | Numeric          | U+0030 – U+0039 (0 … 9)                                         |
+/// | ALetter          | U+0041 – U+005A (A … Z), U+0061 – U+007A (a … z)                |
+/// | ExtendNumLet     | U+005F (_) underscore                                           |
+/// | WSegSpace        | U+0020 (SPACE)                                                  |
+///
+/// The macro MidNumLetQ boils down to: U+002E (.) FULL STOP and U+0027 (')
+/// AHLetter is the same as ALetter, so we don't need to distinguish it.
+///
+/// Any other single ASCII byte is its own boundary (the default WB999).
 pub struct AsciiWordBoundIter<'a> {
     rest: &'a str,
     offset: usize,
@@ -746,12 +771,17 @@ impl<'a> AsciiWordBoundIter<'a> {
     #[inline]
     fn is_infix(b: u8, prev: u8, next: u8) -> bool {
         match b {
-            // numeric separators
+            // Numeric separators such as "1,000" or "3.14" (WB11/WB12)
+            //
+            // "Numeric (MidNum | MidNumLetQ) Numeric"
             b'.' | b',' | b';' | b'\'' if prev.is_ascii_digit() && next.is_ascii_digit() => true,
-            // apostrophe in contractions
-            b'\'' if prev.is_ascii_alphabetic() && next.is_ascii_alphabetic() => true,
-            // dot/colon inside letters
-            b'.' | b':' if prev.is_ascii_alphabetic() && next.is_ascii_alphabetic() => true,
+
+            // Dot or colon inside an alphabetic word ("e.g.", "http://") (WB6/WB7)
+            //
+            // "(MidLetter | MidNumLetQ) AHLetter (MidLetter | MidNumLetQ)"
+            // MidLetter  = b':'
+            // MidNumLetQ = b'.' | b'\''
+            b'\'' | b'.' | b':' if prev.is_ascii_alphabetic() && next.is_ascii_alphabetic() => true,
             _ => false,
         }
     }
@@ -769,7 +799,8 @@ impl<'a> Iterator for AsciiWordBoundIter<'a> {
         let bytes = self.rest.as_bytes();
         let len = bytes.len();
 
-        // 1) Group runs of spaces
+        // 1) Keep horizontal whitespace together.
+        // Spec: WB3d joins adjacent *WSegSpace* into a single segment.
         if bytes[0] == b' ' {
             let mut i = 1;
             while i < len && bytes[i] == b' ' {
@@ -783,6 +814,7 @@ impl<'a> Iterator for AsciiWordBoundIter<'a> {
         }
 
         // 2) Core-run (letters/digits/underscore + infix)
+        // Spec: ALetter × ALetter, Numeric × Numeric etc. (WB5–WB13b)
         if Self::is_core(bytes[0]) {
             let mut i = 1;
             while i < len {
@@ -802,7 +834,8 @@ impl<'a> Iterator for AsciiWordBoundIter<'a> {
             return Some((pos, word));
         }
 
-        // 3) Non-core: CR+LF as one token, otherwise single char
+        // 3) Do not break within CRLF.
+        // Spec: WB3 treats CR+LF as a single non‑breaking pair.
         if bytes[0] == b'\r' && len >= 2 && bytes[1] == b'\n' {
             let word = &self.rest[..2];
             let pos = self.offset;
@@ -810,6 +843,8 @@ impl<'a> Iterator for AsciiWordBoundIter<'a> {
             self.offset += 2;
             Some((pos, word))
         } else {
+            // 4) Otherwise, break everywhere
+            // Spec: the catch‑all rule WB999.
             let word = &self.rest[..1];
             let pos = self.offset;
             self.rest = &self.rest[1..];
@@ -828,7 +863,8 @@ impl<'a> DoubleEndedIterator for AsciiWordBoundIter<'a> {
         let bytes = rest.as_bytes();
         let len = bytes.len();
 
-        // 1) Trailing spaces
+        // 1) Group runs of spaces
+        // Spec: WB3d joins adjacent *WSegSpace* into a single segment.
         if bytes[len - 1] == b' ' {
             // find start of this last run of spaces
             let mut start = len - 1;
@@ -841,7 +877,8 @@ impl<'a> DoubleEndedIterator for AsciiWordBoundIter<'a> {
             return Some((pos, word));
         }
 
-        // 2) Trailing core-run (letters/digits/underscore + infix)
+        // 2) Trailing Core-run (letters/digits/underscore + infix)
+        // Spec: ALetter × ALetter, Numeric × Numeric etc. (WB5–WB13b)
         if Self::is_core(bytes[len - 1]) {
             // scan backwards as long as we see `is_core` or an `is_infix`
             let mut start = len - 1;
@@ -861,7 +898,8 @@ impl<'a> DoubleEndedIterator for AsciiWordBoundIter<'a> {
             return Some((pos, word));
         }
 
-        // 3) CR+LF at end
+        // 3) Non-core: CR+LF as one token, otherwise single char
+        // Spec: WB3 treats CR+LF as a single non‑breaking pair.
         if len >= 2 && bytes[len - 2] == b'\r' && bytes[len - 1] == b'\n' {
             let start = len - 2;
             let word = &rest[start..];
@@ -870,7 +908,8 @@ impl<'a> DoubleEndedIterator for AsciiWordBoundIter<'a> {
             return Some((pos, word));
         }
 
-        // 4) Single non-core byte
+        // 4) Fallback – every other byte is its own segment
+        // Spec: the catch‑all rule WB999.
         let start = len - 1;
         let word = &rest[start..];
         let pos = self.offset + start;
