@@ -756,7 +756,7 @@ impl<'a> UWordBounds<'a> {
 ///
 /// Any other single ASCII byte is its own boundary (the default WB999).
 #[derive(Debug)]
-pub struct AsciiWordBoundIter<'a> {
+struct AsciiWordBoundIter<'a> {
     rest: &'a str,
     offset: usize,
 }
@@ -988,7 +988,7 @@ pub fn new_word_bound_indices(s: &str) -> UWordBoundIndices<'_> {
 }
 
 #[inline]
-pub fn new_ascii_word_bound_indices(s: &str) -> AsciiWordBoundIter<'_> {
+fn new_ascii_word_bound_indices(s: &str) -> AsciiWordBoundIter<'_> {
     AsciiWordBoundIter::new(s)
 }
 
@@ -1044,6 +1044,20 @@ mod tests {
         use crate::tables::word as wd;
         let (_, _, cat) = wd::word_category('\u{6dd}');
         assert_eq!(cat, wd::WC_Numeric);
+    }
+
+    #[test]
+    fn test_ascii_word_bound_indices_various_cases() {
+        let s = "Hello, world!";
+        let words: Vec<(usize, &str)> = new_ascii_word_bound_indices(s).collect();
+        let expected = vec![
+            (0, "Hello"), // simple letters
+            (5, ","),
+            (6, " "),     // space after comma
+            (7, "world"), // skip comma+space, stop at '!'
+            (12, "!"),    // punctuation at the end
+        ];
+        assert_eq!(words, expected);
     }
 
     #[test]
