@@ -56,11 +56,16 @@
 )]
 #![no_std]
 
+#[cfg(test)]
+extern crate std;
+
 pub use grapheme::{GraphemeCursor, GraphemeIncomplete};
 pub use grapheme::{GraphemeIndices, Graphemes};
 pub use sentence::{USentenceBoundIndices, USentenceBounds, UnicodeSentences};
 pub use tables::UNICODE_VERSION;
-pub use word::{UWordBoundIndices, UWordBounds, UnicodeWordIndices, UnicodeWords};
+pub use word::{UWordBoundIndices, UWordBounds};
+
+use crate::word::{UnicodeWordIndices, UnicodeWords};
 
 mod grapheme;
 mod sentence;
@@ -248,7 +253,7 @@ pub trait UnicodeSegmentation {
 
 impl UnicodeSegmentation for str {
     #[inline]
-    fn graphemes(&self, is_extended: bool) -> Graphemes {
+    fn graphemes(&self, is_extended: bool) -> Graphemes<'_> {
         grapheme::new_graphemes(self, is_extended)
     }
 
@@ -258,32 +263,32 @@ impl UnicodeSegmentation for str {
     }
 
     #[inline]
-    fn unicode_words(&self) -> UnicodeWords {
+    fn unicode_words(&self) -> UnicodeWords<'_> {
         word::new_unicode_words(self)
     }
 
     #[inline]
-    fn unicode_word_indices(&self) -> UnicodeWordIndices {
+    fn unicode_word_indices(&self) -> UnicodeWordIndices<'_> {
         word::new_unicode_word_indices(self)
     }
 
     #[inline]
-    fn split_word_bounds(&self) -> UWordBounds {
+    fn split_word_bounds(&self) -> UWordBounds<'_> {
         word::new_word_bounds(self)
     }
 
     #[inline]
-    fn split_word_bound_indices(&self) -> UWordBoundIndices {
+    fn split_word_bound_indices(&self) -> UWordBoundIndices<'_> {
         word::new_word_bound_indices(self)
     }
 
     #[inline]
-    fn unicode_sentences(&self) -> UnicodeSentences {
+    fn unicode_sentences(&self) -> UnicodeSentences<'_> {
         sentence::new_unicode_sentences(self)
     }
 
     #[inline]
-    fn split_sentence_bounds(&self) -> USentenceBounds {
+    fn split_sentence_bounds(&self) -> USentenceBounds<'_> {
         sentence::new_sentence_bounds(self)
     }
 

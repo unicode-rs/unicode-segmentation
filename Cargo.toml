@@ -24,6 +24,7 @@ no_std = [] # This is a no-op, preserved for backward compatibility only.
 [dev-dependencies]
 quickcheck = "0.7"
 criterion = "0.5"
+proptest = "1.7.0"
 
 [[bench]]
 name = "chars"
@@ -36,3 +37,8 @@ harness = false
 [[bench]]
 name = "word_bounds"
 harness = false
+
+[[bench]]
+name = "unicode_word_indices"
+harness = false
+
