@@ -258,7 +258,7 @@ impl UnicodeSegmentation for str {
     }
 
     #[inline]
-    fn grapheme_indices(&self, is_extended: bool) -> GraphemeIndices {
+    fn grapheme_indices(&self, is_extended: bool) -> GraphemeIndices<'_> {
         grapheme::new_grapheme_indices(self, is_extended)
     }
 
@@ -293,7 +293,7 @@ impl UnicodeSegmentation for str {
     }
 
     #[inline]
-    fn split_sentence_bound_indices(&self) -> USentenceBoundIndices {
+    fn split_sentence_bound_indices(&self) -> USentenceBoundIndices<'_> {
         sentence::new_sentence_bound_indices(self)
     }
 }

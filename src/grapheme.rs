@@ -517,14 +517,14 @@ impl GraphemeCursor {
         for ch in chunk.chars().rev() {
             if self.grapheme_category(ch) != gr::GC_Regional_Indicator {
                 self.ris_count = Some(ris_count);
-                self.decide((ris_count % 2) == 0);
+                self.decide(ris_count.is_multiple_of(2));
                 return;
             }
             ris_count += 1;
         }
         self.ris_count = Some(ris_count);
         if chunk_start == 0 {
-            self.decide((ris_count % 2) == 0);
+            self.decide(ris_count.is_multiple_of(2));
         } else {
             self.pre_context_offset = Some(chunk_start);
             self.state = GraphemeState::Regional;
