@@ -1027,8 +1027,8 @@ mod tests {
         new_ascii_word_bound_indices, new_unicode_words_ascii, new_word_bound_indices,
     };
     use std::string::String;
+    use std::vec;
     use std::vec::Vec;
-    use std::{vec};
 
     use proptest::prelude::*;
 
