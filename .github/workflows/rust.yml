@@ -34,4 +34,4 @@ jobs:
     - name: Verify regenerated files
       run: ./scripts/unicode.py && diff tables.rs src/tables.rs
     - name: Verify regenerated tests
-      run: ./scripts/unicode_gen_breaktests.py && diff testdata.rs tests/testdata/mod.rs
+      run: ./scripts/unicode_gen_breaktests.py && diff testdata/mod.rs tests/testdata/mod.rs
