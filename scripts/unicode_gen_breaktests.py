@@ -26,7 +26,7 @@ def load_test_data(f, optsplit=[]):
 
     unicode.fetch(f)
     data = []
-    for line in fileinput.input(os.path.basename(f)):
+    for line in fileinput.input(os.path.basename(f), encoding="utf-8"):
         # lines that include a test start with the ÷ character
         if len(line) < 2 or not line.startswith('÷'):
             continue
@@ -205,7 +205,7 @@ def create_sentence_data(f):
     unicode.emit_table(f, "TEST_SENTENCE", test, wtype, True, showfun, True)
 
 if __name__ == "__main__":
-    with open("testdata.rs", "w") as rf:
+    with open(os.path.join("testdata", "mod.rs"), "w", encoding="utf-8", newline="\n") as rf:
         rf.write(unicode.preamble)
         create_grapheme_data(rf)
         create_words_data(rf)

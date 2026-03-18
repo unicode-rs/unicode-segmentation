@@ -54,7 +54,7 @@ expanded_categories = {
 # these are the surrogate codepoints, which are not valid rust characters
 surrogate_codepoints = (0xd800, 0xdfff)
 
-UNICODE_VERSION = (16, 0, 0)
+UNICODE_VERSION = (17, 0, 0)
 
 UNICODE_VERSION_NUMBER = "%s.%s.%s" %UNICODE_VERSION
 
@@ -78,28 +78,28 @@ def load_gencats(f):
     fetch(f)
     gencats = {}
 
-    udict = {};
-    range_start = -1;
-    for line in fileinput.input(f):
-        data = line.split(';');
+    udict = {}
+    range_start = -1
+    for line in fileinput.input(f, encoding="utf-8"):
+        data = line.split(';')
         if len(data) != 15:
             continue
-        cp = int(data[0], 16);
+        cp = int(data[0], 16)
         if is_surrogate(cp):
             continue
         if range_start >= 0:
             for i in range(range_start, cp):
-                udict[i] = data;
-            range_start = -1;
+                udict[i] = data
+            range_start = -1
         if data[1].endswith(", First>"):
-            range_start = cp;
-            continue;
-        udict[cp] = data;
+            range_start = cp
+            continue
+        udict[cp] = data
 
     for code in udict:
         [code_org, name, gencat, combine, bidi,
          decomp, deci, digit, num, mirror,
-         old, iso, upcase, lowcase, titlecase ] = udict[code];
+         old, iso, upcase, lowcase, titlecase ] = udict[code]
 
         # place letter in categories as appropriate
         for cat in [gencat, "Assigned"] + expanded_categories.get(gencat, []):
@@ -161,7 +161,7 @@ def load_properties(f, interestingprops: "list[str | tuple[str, str]] | None" = 
     re1 = re.compile(r"^\s*([0-9A-F]+)\s*;\s*(\w+)(?:\s*;\s*(\w+))?")
     re2 = re.compile(r"^\s*([0-9A-F]+)\.\.([0-9A-F]+)\s*;\s*(\w+)(?:\s*;\s*(\w+))?")
 
-    for line in fileinput.input(os.path.basename(f)):
+    for line in fileinput.input(os.path.basename(f), encoding="utf-8"):
         prop = None
         d_lo = 0
         d_hi = 0
@@ -389,7 +389,7 @@ if __name__ == "__main__":
     r = "tables.rs"
     if os.path.exists(r):
         os.remove(r)
-    with open(r, "w") as rf:
+    with open(r, "w", encoding="utf-8", newline="\n") as rf:
         # write the file's preamble
         rf.write(preamble)
         rf.write("""
