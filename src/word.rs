@@ -466,7 +466,8 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
         let mut previdx = idx;
         let mut saveidx = idx;
         let mut state = Start;
-        let mut savestate = Start;
+        let mut extend_savestate = Start;
+        let mut looking_for_zwj = false;
         let mut cat = wd::WC_Any;
 
         let mut skipped_format_extend = false;
@@ -480,6 +481,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                 None => wd::word_category(ch).2,
                 _ => self.catb.take().unwrap(),
             };
+
             take_cat = true;
 
             // backward iterator over word boundaries. Mostly the same as the forward
@@ -488,12 +490,12 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
             //     Hebrew Letter immediately before it.
             // (2) Format and Extend char handling takes some gymnastics.
 
-            if cat == wd::WC_Extend || cat == wd::WC_Format || (cat == wd::WC_ZWJ && state != Zwj) {
+            if cat == wd::WC_Extend || cat == wd::WC_Format || (cat == wd::WC_ZWJ && !looking_for_zwj) {
                 // WB3c has more priority so we should not
                 // fold in that case
                 if !matches!(state, FormatExtend(_) | Start) {
                     saveidx = previdx;
-                    savestate = state;
+                    extend_savestate = state;
                     state = FormatExtend(AcceptNone);
                 }
 
@@ -502,16 +504,27 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                 }
             } else if state == FormatExtend(AcceptNone) {
                 // finished a scan of some Format|Extend chars, restore previous state
-                state = savestate;
+                state = extend_savestate;
                 previdx = saveidx;
                 take_cat = false;
                 skipped_format_extend = true;
             }
 
+            if is_emoji(ch) {
+                looking_for_zwj = true;
+            } else if cat != wd::WC_Extend && cat != wd::WC_Format && cat != wd::WC_ZWJ {
+                looking_for_zwj = false;
+            }
+
             // Don't use `continue` in this match without updating `catb`
             state = match state {
+                _ if looking_for_zwj && cat == wd::WC_ZWJ => {
+                    // Rule Wb3c
+                    looking_for_zwj = false;
+                    FormatExtend(AcceptAny)
+                }
                 Start | FormatExtend(AcceptAny) => match cat {
-                    _ if is_emoji(ch) => Zwj,
+   
                     wd::WC_ALetter => Letter, // rule WB5, WB7, WB10, WB13b
                     wd::WC_Hebrew_Letter => HLetter, // rule WB5, WB7, WB7c, WB10, WB13b
                     wd::WC_Numeric => Numeric, // rule WB8, WB9, WB11, WB13b
@@ -539,14 +552,6 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                         break; // rule WB3a
                     }
                     _ => break, // rule WB999
-                },
-                Zwj => match cat {
-                    // rule WB3c
-                    wd::WC_ZWJ => FormatExtend(AcceptAny),
-                    _ => {
-                        take_curr = false;
-                        break;
-                    }
                 },
                 WSegSpace => match cat {
                     // rule WB3d
@@ -638,15 +643,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                         break;
                     }
                 },
-                Emoji => {
-                    if is_emoji(ch) {
-                        // rule WB3c
-                        Zwj
-                    } else {
-                        take_curr = false;
-                        break;
-                    }
-                }
+                Emoji | Zwj => unreachable!(), // Not used in the reverse iterator.
                 FormatExtend(t) => match t {
                     RequireNumeric if cat == wd::WC_Numeric => Numeric, // rule WB12
                     RequireLetter if cat == wd::WC_ALetter => Letter,   // rule WB6

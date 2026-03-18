@@ -71,7 +71,7 @@ fn test_graphemes() {
         // test reverse iterator
         assert!(UnicodeSegmentation::graphemes(s, true)
             .rev()
-            .eq(gt.iter().rev().cloned()));
+            .eq(gt.iter().rev().cloned()), "Forward and reverse boundaries for {:?} should stay the same", s);
         assert!(UnicodeSegmentation::graphemes(s, false)
             .rev()
             .eq(gf.iter().rev().cloned()));
