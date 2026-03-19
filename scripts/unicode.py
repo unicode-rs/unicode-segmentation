@@ -80,7 +80,7 @@ def load_gencats(f):
 
     udict = {}
     range_start = -1
-    for line in fileinput.input(f, encoding="utf-8"):
+    for line in fileinput.input(f):
         data = line.split(';')
         if len(data) != 15:
             continue
@@ -161,7 +161,7 @@ def load_properties(f, interestingprops: "list[str | tuple[str, str]] | None" = 
     re1 = re.compile(r"^\s*([0-9A-F]+)\s*;\s*(\w+)(?:\s*;\s*(\w+))?")
     re2 = re.compile(r"^\s*([0-9A-F]+)\.\.([0-9A-F]+)\s*;\s*(\w+)(?:\s*;\s*(\w+))?")
 
-    for line in fileinput.input(os.path.basename(f), encoding="utf-8"):
+    for line in fileinput.input(os.path.basename(f)):
         prop = None
         d_lo = 0
         d_hi = 0

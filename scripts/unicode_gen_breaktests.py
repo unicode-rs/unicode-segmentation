@@ -26,7 +26,7 @@ def load_test_data(f, optsplit=[]):
 
     unicode.fetch(f)
     data = []
-    for line in fileinput.input(os.path.basename(f), encoding="utf-8"):
+    for line in fileinput.input(os.path.basename(f)):
         # lines that include a test start with the ÷ character
         if len(line) < 2 or not line.startswith('÷'):
             continue
