@@ -78,28 +78,28 @@ def load_gencats(f):
     fetch(f)
     gencats = {}
 
-    udict = {};
-    range_start = -1;
+    udict = {}
+    range_start = -1
     for line in fileinput.input(f):
-        data = line.split(';');
+        data = line.split(';')
         if len(data) != 15:
             continue
-        cp = int(data[0], 16);
+        cp = int(data[0], 16)
         if is_surrogate(cp):
             continue
         if range_start >= 0:
             for i in range(range_start, cp):
-                udict[i] = data;
-            range_start = -1;
+                udict[i] = data
+            range_start = -1
         if data[1].endswith(", First>"):
-            range_start = cp;
-            continue;
-        udict[cp] = data;
+            range_start = cp
+            continue
+        udict[cp] = data
 
     for code in udict:
         [code_org, name, gencat, combine, bidi,
          decomp, deci, digit, num, mirror,
-         old, iso, upcase, lowcase, titlecase ] = udict[code];
+         old, iso, upcase, lowcase, titlecase ] = udict[code]
 
         # place letter in categories as appropriate
         for cat in [gencat, "Assigned"] + expanded_categories.get(gencat, []):
@@ -389,7 +389,7 @@ if __name__ == "__main__":
     r = "tables.rs"
     if os.path.exists(r):
         os.remove(r)
-    with open(r, "w") as rf:
+    with open(r, "w", encoding="utf-8", newline="\n") as rf:
         # write the file's preamble
         rf.write(preamble)
         rf.write("""
