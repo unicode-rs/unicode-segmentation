@@ -205,7 +205,7 @@ def create_sentence_data(f):
     unicode.emit_table(f, "TEST_SENTENCE", test, wtype, True, showfun, True)
 
 if __name__ == "__main__":
-    with open(os.path.join("testdata", "mod.rs"), "w", encoding="utf-8", newline="\n") as rf:
+    with open("testdata.rs", "w", encoding="utf-8", newline="\n") as rf:
         rf.write(unicode.preamble)
         create_grapheme_data(rf)
         create_words_data(rf)
