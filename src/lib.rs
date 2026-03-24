@@ -63,9 +63,7 @@ pub use grapheme::{GraphemeCursor, GraphemeIncomplete};
 pub use grapheme::{GraphemeIndices, Graphemes};
 pub use sentence::{USentenceBoundIndices, USentenceBounds, UnicodeSentences};
 pub use tables::UNICODE_VERSION;
-pub use word::{UWordBoundIndices, UWordBounds};
-
-use crate::word::{UnicodeWordIndices, UnicodeWords};
+pub use word::{UWordBoundIndices, UWordBounds, UnicodeWordIndices, UnicodeWords};
 
 mod grapheme;
 mod sentence;

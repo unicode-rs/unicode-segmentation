@@ -43,11 +43,14 @@ unicode-segmentation = "1"
 
 # Change Log
 
-## 1.13.0
+## 1.13.1
 
 * [#147](https://github.org/unicode-rs/unicode-segmentation/pull/147) Add ascii fast path for unicode_word_indices and unicode_words
 * [#157](https://github.org/unicode-rs/unicode-segmentation/pull/157) Support Unicode 17.0.0
 
+## 0.13.0
+
+Yanked due to accidental breakage.
 
 ## 1.12.0
 
@@ -56,6 +59,7 @@ unicode-segmentation = "1"
 * [#138](https://github.com/unicode-rs/unicode-segmentation/pull/138) Fix arithmetic overflow
 * [#137](https://github.com/unicode-rs/unicode-segmentation/pull/137) Fix unwrap panic in next_boundary()
 * [#140](https://github.com/unicode-rs/unicode-segmentation/pull/140) Support Unicode 16.0.0
+
 
 ## 1.11.0
 * [#124](https://github.com/unicode-rs/unicode-segmentation/pull/124) Update data to Unicode 15.1
