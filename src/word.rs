@@ -488,6 +488,10 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
             //     Hebrew Letter immediately before it.
             // (2) Format and Extend char handling takes some gymnastics.
 
+            if cat == wd::WC_ZWJ && state != Zwj && self.next_significant_is_emoji(idx) {
+                continue;
+            }
+
             if cat == wd::WC_Extend || cat == wd::WC_Format || (cat == wd::WC_ZWJ && state != Zwj) {
                 // WB3c has more priority so we should not
                 // fold in that case
@@ -511,11 +515,10 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
             // Don't use `continue` in this match without updating `catb`
             state = match state {
                 Start | FormatExtend(AcceptAny) => match cat {
-                    _ if is_emoji(ch) => Zwj,
-                    wd::WC_ALetter => Letter, // rule WB5, WB7, WB10, WB13b
-                    wd::WC_Hebrew_Letter => HLetter, // rule WB5, WB7, WB7c, WB10, WB13b
-                    wd::WC_Numeric => Numeric, // rule WB8, WB9, WB11, WB13b
-                    wd::WC_Katakana => Katakana, // rule WB13, WB13b
+                    wd::WC_ALetter => Letter,            // rule WB5, WB7, WB10, WB13b
+                    wd::WC_Hebrew_Letter => HLetter,     // rule WB5, WB7, WB7c, WB10, WB13b
+                    wd::WC_Numeric => Numeric,           // rule WB8, WB9, WB11, WB13b
+                    wd::WC_Katakana => Katakana,         // rule WB13, WB13b
                     wd::WC_ExtendNumLet => ExtendNumLet, // rule WB13a
                     wd::WC_Regional_Indicator => Regional(RegionalState::Unknown), // rule WB13c
                     // rule WB4:
@@ -538,6 +541,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                         }
                         break; // rule WB3a
                     }
+                    _ if is_emoji(ch) => Zwj,
                     _ => break, // rule WB999
                 },
                 Zwj => match cat {
@@ -727,6 +731,21 @@ impl<'a> UWordBounds<'a> {
         } else {
             None
         }
+    }
+
+    #[inline]
+    fn next_significant_is_emoji(&self, idx: usize) -> bool {
+        use crate::tables::word as wd;
+        let mut nidx = idx;
+        while let Some(ncat) = self.get_next_cat(nidx) {
+            nidx += self.string[nidx..].chars().next().unwrap().len_utf8();
+            if ncat == wd::WC_Extend || ncat == wd::WC_Format {
+                continue;
+            }
+            let nch = self.string[nidx..].chars().next().unwrap();
+            return is_emoji(nch);
+        }
+        false
     }
 }
 
