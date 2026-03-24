@@ -469,6 +469,12 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
         let mut savestate = Start;
         let mut cat = wd::WC_Any;
 
+        // WB3c is context-sensitive (ZWJ + Extended_Pictographic),
+        // while WB4 collapses Extend/Format and would otherwise hide that context.
+        // We therefore keep this context outside the main state machine:
+        // whether the nearest non-(Extend|Format) char to the right is emoji.
+        let mut right_significant_is_emoji: bool = false;
+
         let mut skipped_format_extend = false;
 
         for (curr, ch) in self.string.char_indices().rev() {
@@ -487,6 +493,18 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
             // (1) If we encounter a single quote in the Start state, we have to check for a
             //     Hebrew Letter immediately before it.
             // (2) Format and Extend char handling takes some gymnastics.
+
+            // Reverse-direction WB3c check: when we encounter ZWJ and the nearest
+            // significant right-side char is emoji, do not break here.
+            if cat == wd::WC_ZWJ && state != Zwj && right_significant_is_emoji {
+                continue;
+            }
+
+            // Keep the right-side WB3c context up to date as we move left.
+            // Ignore Extend/Format here to mirror WB4 collapsing behavior.
+            if cat != wd::WC_Extend && cat != wd::WC_Format {
+                right_significant_is_emoji = is_emoji(ch);
+            }
 
             if cat == wd::WC_Extend || cat == wd::WC_Format || (cat == wd::WC_ZWJ && state != Zwj) {
                 // WB3c has more priority so we should not
@@ -511,11 +529,10 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
             // Don't use `continue` in this match without updating `catb`
             state = match state {
                 Start | FormatExtend(AcceptAny) => match cat {
-                    _ if is_emoji(ch) => Zwj,
-                    wd::WC_ALetter => Letter, // rule WB5, WB7, WB10, WB13b
-                    wd::WC_Hebrew_Letter => HLetter, // rule WB5, WB7, WB7c, WB10, WB13b
-                    wd::WC_Numeric => Numeric, // rule WB8, WB9, WB11, WB13b
-                    wd::WC_Katakana => Katakana, // rule WB13, WB13b
+                    wd::WC_ALetter => Letter,            // rule WB5, WB7, WB10, WB13b
+                    wd::WC_Hebrew_Letter => HLetter,     // rule WB5, WB7, WB7c, WB10, WB13b
+                    wd::WC_Numeric => Numeric,           // rule WB8, WB9, WB11, WB13b
+                    wd::WC_Katakana => Katakana,         // rule WB13, WB13b
                     wd::WC_ExtendNumLet => ExtendNumLet, // rule WB13a
                     wd::WC_Regional_Indicator => Regional(RegionalState::Unknown), // rule WB13c
                     // rule WB4:
@@ -538,6 +555,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                         }
                         break; // rule WB3a
                     }
+                    _ if is_emoji(ch) => Zwj,
                     _ => break, // rule WB999
                 },
                 Zwj => match cat {
