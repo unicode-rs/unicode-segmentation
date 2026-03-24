@@ -494,6 +494,10 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                 continue;
             }
 
+            if cat != wd::WC_Extend && cat != wd::WC_Format {
+                right_significant_is_emoji = is_emoji(ch);
+            }
+
             if cat == wd::WC_Extend || cat == wd::WC_Format || (cat == wd::WC_ZWJ && state != Zwj) {
                 // WB3c has more priority so we should not
                 // fold in that case
@@ -662,10 +666,6 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                     _ => break,                                         // backtrack will happens
                 },
             };
-
-            if cat != wd::WC_Extend && cat != wd::WC_Format {
-                right_significant_is_emoji = is_emoji(ch);
-            }
         }
 
         if let FormatExtend(t) = state {
