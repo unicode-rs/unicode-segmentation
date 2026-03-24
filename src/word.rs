@@ -468,6 +468,8 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
         let mut state = Start;
         let mut savestate = Start;
         let mut cat = wd::WC_Any;
+        // Tracks whether the nearest non-(Extend|Format) char to the right is emoji.
+        let mut right_significant_is_emoji: bool = false;
 
         let mut skipped_format_extend = false;
 
@@ -488,7 +490,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
             //     Hebrew Letter immediately before it.
             // (2) Format and Extend char handling takes some gymnastics.
 
-            if cat == wd::WC_ZWJ && state != Zwj && self.next_significant_is_emoji(idx) {
+            if cat == wd::WC_ZWJ && state != Zwj && right_significant_is_emoji {
                 continue;
             }
 
@@ -659,6 +661,10 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                     RequireHLetter if cat == wd::WC_Hebrew_Letter => HLetter, // rule WB7b
                     _ => break,                                         // backtrack will happens
                 },
+            };
+
+            if cat != wd::WC_Extend && cat != wd::WC_Format {
+                right_significant_is_emoji = is_emoji(ch);
             }
         }
 
@@ -731,21 +737,6 @@ impl<'a> UWordBounds<'a> {
         } else {
             None
         }
-    }
-
-    #[inline]
-    fn next_significant_is_emoji(&self, idx: usize) -> bool {
-        use crate::tables::word as wd;
-        let mut nidx = idx;
-        while let Some(ncat) = self.get_next_cat(nidx) {
-            nidx += self.string[nidx..].chars().next().unwrap().len_utf8();
-            if ncat == wd::WC_Extend || ncat == wd::WC_Format {
-                continue;
-            }
-            let nch = self.string[nidx..].chars().next().unwrap();
-            return is_emoji(nch);
-        }
-        false
     }
 }
 
