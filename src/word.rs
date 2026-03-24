@@ -468,7 +468,11 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
         let mut state = Start;
         let mut savestate = Start;
         let mut cat = wd::WC_Any;
-        // Tracks whether the nearest non-(Extend|Format) char to the right is emoji.
+
+        // WB3c is context-sensitive (ZWJ + Extended_Pictographic),
+        // while WB4 collapses Extend/Format and would otherwise hide that context.
+        // We therefore keep this context outside the main state machine:
+        // whether the nearest non-(Extend|Format) char to the right is emoji.
         let mut right_significant_is_emoji: bool = false;
 
         let mut skipped_format_extend = false;
@@ -490,10 +494,14 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
             //     Hebrew Letter immediately before it.
             // (2) Format and Extend char handling takes some gymnastics.
 
+            // Reverse-direction WB3c check: when we encounter ZWJ and the nearest
+            // significant right-side char is emoji, do not break here.
             if cat == wd::WC_ZWJ && state != Zwj && right_significant_is_emoji {
                 continue;
             }
 
+            // Keep the right-side WB3c context up to date as we move left.
+            // Ignore Extend/Format here to mirror WB4 collapsing behavior.
             if cat != wd::WC_Extend && cat != wd::WC_Format {
                 right_significant_is_emoji = is_emoji(ch);
             }
@@ -665,7 +673,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                     RequireHLetter if cat == wd::WC_Hebrew_Letter => HLetter, // rule WB7b
                     _ => break,                                         // backtrack will happens
                 },
-            };
+            }
         }
 
         if let FormatExtend(t) = state {
