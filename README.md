@@ -45,10 +45,10 @@ unicode-segmentation = "1"
 
 ## 1.13.1
 
-* [#147](https://github.org/unicode-rs/unicode-segmentation/pull/147) Add ascii fast path for unicode_word_indices and unicode_words
-* [#157](https://github.org/unicode-rs/unicode-segmentation/pull/157) Support Unicode 17.0.0
+* [#147](https://github.com/unicode-rs/unicode-segmentation/pull/147) Add ascii fast path for unicode_word_indices and unicode_words
+* [#157](https://github.com/unicode-rs/unicode-segmentation/pull/157) Support Unicode 17.0.0
 
-## 0.13.0
+## 1.13.0
 
 Yanked due to accidental breakage.
 
