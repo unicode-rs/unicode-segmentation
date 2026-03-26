@@ -43,14 +43,15 @@ unicode-segmentation = "1"
 
 # Change Log
 
-## 1.13.1
+## 1.13.2
 
+* [#164](https://github.com/unicode-rs/unicode-segmentation/pull/164) Set explicit 1.85 MSRV
 * [#147](https://github.com/unicode-rs/unicode-segmentation/pull/147) Add ascii fast path for unicode_word_indices and unicode_words
 * [#157](https://github.com/unicode-rs/unicode-segmentation/pull/157) Support Unicode 17.0.0
 
-## 1.13.0
+## 1.13.0, 1.13.1
 
-Yanked due to accidental breakage.
+Yanked due to accidental breakage and MSRV mistag.
 
 ## 1.12.0
 
