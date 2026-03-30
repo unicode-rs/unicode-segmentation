@@ -1,5 +1,5 @@
 Iterators which split strings on Grapheme Cluster or Word boundaries, according
-to the [Unicode Standard Annex #29](http://www.unicode.org/reports/tr29/) rules.
+to the [Unicode Standard Annex #29](https://www.unicode.org/reports/tr29/) rules.
 
 [![Build Status](https://github.com/unicode-rs/unicode-segmentation/actions/workflows/rust.yml/badge.svg)](https://github.com/unicode-rs/unicode-segmentation/actions/workflows/rust.yml)
 
@@ -83,7 +83,7 @@ Yanked due to accidental breakage and MSRV mistag.
 * [#94](https://github.com/unicode-rs/unicode-segmentation/pull/94) Add Initial fuzzer for oss-fuzz integration
 * [#93](https://github.com/unicode-rs/unicode-segmentation/pull/93) Fix  unused imports and deprecated pattern warnings
 * [#91](https://github.com/unicode-rs/unicode-segmentation/pull/92) Made local variable immutable by moving it into loop
-* [#91](https://github.com/unicode-rs/unicode-segmentation/pull/91) Add new iterator [UnicodeWordIndices](https://unicode-rs.github.io/unicode-segmentation/unicode_segmentation/struct.UnicodeWordIndices.html) and [unicode_word_indices](https://unicode-rs.github.io/unicode-segmentation/unicode_segmentation/trait.UnicodeSegmentation.html#tymethod.unicode_word_indices)
+* [#91](https://github.com/unicode-rs/unicode-segmentation/pull/91) Add new iterator [UnicodeWordIndices](https://docs.rs/unicode-segmentation/latest/unicode_segmentation/struct.UnicodeWordIndices.html) and [unicode_word_indices](https://docs.rs/unicode-segmentation/latest/unicode_segmentation/trait.UnicodeSegmentation.html#tymethod.unicode_word_indices)
 
 ## 1.7.1
 
