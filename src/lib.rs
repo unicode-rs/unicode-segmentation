@@ -8,17 +8,15 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-//! Iterators which split strings on Grapheme Cluster, Word or Sentence boundaries, according
-//! to the [Unicode Standard Annex #29](http://www.unicode.org/reports/tr29/) rules.
+//! Iterators which split strings on Grapheme Cluster or Word boundaries, according
+//! to the [Unicode Standard Annex #29](https://www.unicode.org/reports/tr29/) rules.
 //!
 //! ```rust
-//! extern crate unicode_segmentation;
-//!
 //! use unicode_segmentation::UnicodeSegmentation;
 //!
 //! fn main() {
 //!     let s = "a̐éö̲\r\n";
-//!     let g = UnicodeSegmentation::graphemes(s, true).collect::<Vec<&str>>();
+//!     let g = s.graphemes(true).collect::<Vec<&str>>();
 //!     let b: &[_] = &["a̐", "é", "ö̲", "\r\n"];
 //!     assert_eq!(g, b);
 //!
@@ -46,7 +44,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! unicode-segmentation = "1.9.0"
+//! unicode-segmentation = "1"
 //! ```
 
 #![deny(missing_docs, unsafe_code)]
