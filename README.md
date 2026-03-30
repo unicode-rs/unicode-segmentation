@@ -1,5 +1,6 @@
-Iterators which split strings on Grapheme Cluster or Word boundaries, according
-to the [Unicode Standard Annex #29](https://www.unicode.org/reports/tr29/) rules.
+Iterators which split strings on Grapheme Cluster, Word, or Sentence boundaries,
+according to the
+[Unicode Standard Annex #29](https://www.unicode.org/reports/tr29/) rules.
 
 [![Build Status](https://github.com/unicode-rs/unicode-segmentation/actions/workflows/rust.yml/badge.svg)](https://github.com/unicode-rs/unicode-segmentation/actions/workflows/rust.yml)
 

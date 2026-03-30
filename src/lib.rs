@@ -8,7 +8,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-//! Iterators which split strings on Grapheme Cluster or Word boundaries, according
+//! Iterators which split strings on Grapheme Cluster, Word, or Sentence boundaries, according
 //! to the [Unicode Standard Annex #29](https://www.unicode.org/reports/tr29/) rules.
 //!
 //! ```rust
