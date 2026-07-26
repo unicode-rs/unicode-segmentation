@@ -623,7 +623,10 @@ impl GraphemeCursor {
             let mut need_pre_context = true;
             match self.cat_after.unwrap() {
                 gr::GC_InCB_Consonant => self.state = GraphemeState::InCbConsonant,
-                gr::GC_Regional_Indicator => self.state = GraphemeState::Regional,
+                // Only look back for the RI count if it isn't known already.
+                gr::GC_Regional_Indicator if self.ris_count.is_none() => {
+                    self.state = GraphemeState::Regional
+                }
                 gr::GC_Extended_Pictographic => {
                     self.state = GraphemeState::Emoji { seen_zwj: false }
                 }
