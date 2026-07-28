@@ -383,11 +383,8 @@ impl<'a> Iterator for USentenceBounds<'a> {
     #[inline]
     fn next(&mut self) -> Option<&'a str> {
         if self.sentence_start.is_none() {
-            if let Some(start_pos) = self.iter.next() {
-                self.sentence_start = Some(start_pos)
-            } else {
-                return None;
-            }
+            let start_pos = self.iter.next()?;
+            self.sentence_start = Some(start_pos);
         }
 
         if let Some(break_pos) = self.iter.next() {
