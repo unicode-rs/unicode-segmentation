@@ -196,6 +196,37 @@ def load_properties(f, interestingprops: "list[str | tuple[str, str]] | None" = 
 
     return props
 
+# Direct-lookup windows for the Grapheme_Cluster_Break table.
+#
+# The windows below become direct-indexed `u8` arrays.
+#
+# The gaps between them are either resolved arithmetically
+# or by a binary search over the residual range table. 
+
+# Every arithmetic shortcut is asserted against the parsed UCD data in `emit_grapheme_module`,
+# so a future Unicode version that invalidates one of these assumptions fails loudly here instead of silently emitting wrong tables.
+#
+#   [0, T0_END)            T0, direct
+#   [T0_END, T1_LO)        CJK..Vai, all Any but for two Extended_Pictographic
+#   [T1_LO, T1_HI)         T1, direct
+#   [HANGUL_LO, HANGUL_HI) Hangul syllables, LV every 28th and LVT otherwise
+#   [VS_LO, VS_HI)         variation selectors, all Extend
+#   [T2_LO, T2_HI)         T2, direct (emoji)
+#   everything else        residual range table
+GRAPHEME_T0_END = 0x30A0  # ends just past the last combining kana mark
+GRAPHEME_T1_LO = 0xA660
+GRAPHEME_T1_HI = 0xAC00
+GRAPHEME_HANGUL_LO = 0xAC00
+GRAPHEME_HANGUL_HI = 0xD7A4
+GRAPHEME_VS_LO = 0xFE00
+GRAPHEME_VS_HI = 0xFE10
+GRAPHEME_T2_LO = 0x1F000
+GRAPHEME_T2_HI = 0x1FB00
+
+# Number of bits the residual table reserves for the category,
+# so that a range packs into `(start, end << CAT_BITS | category)`.
+GRAPHEME_CAT_BITS = 5
+
 def escape_char(c):
     return "'\\u{%x}'" % c
 
@@ -283,17 +314,33 @@ def emit_property_module(f, mod, tbl, emit: "list[str | tuple[str, str]]"):
         f.write("    }\n\n")
     f.write("}\n\n")
 
+MAX_CODEPOINT = 0x10FFFF
+
 def emit_break_module(f, break_table, break_cats, name):
     Name = name.capitalize()
-    f.write("""pub mod %s {
-    use core::result::Result::{Ok, Err};
+    Prefix = Name[0]
 
-    pub use self::%sCat::*;
+    break_cats.append("Any")
+    break_cats.sort()
 
-    #[allow(non_camel_case_types)]
-    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-    pub enum %sCat {
-""" % (name, Name, Name))
+    # Each range is one `u32`, `start << cat_bits | category`.
+    # The category field is widened to a power of two so that masking an entry with `(1 << cat_bits) - 1`
+    # proves the decode-table index in bounds and the check folds away.
+    cat_bits = max(1, (len(break_cats) - 1).bit_length())
+    cat_num = {cat: i for i, cat in enumerate(break_cats)}
+
+    # Tile the whole codepoint space: gaps between the source ranges become explicit `Any` entries,
+    # so a codepoint's category is simply the last entry that starts at or before it,
+    # and one `u32` per range replaces a (char, char, Cat) triple.
+    packed = []
+    next_start = 0
+    for (lo, hi, cat) in break_table:
+        if lo > next_start:
+            packed.append(next_start << cat_bits | cat_num["Any"])
+        packed.append(lo << cat_bits | cat_num[cat])
+        next_start = hi + 1
+    if next_start <= MAX_CODEPOINT:
+        packed.append(next_start << cat_bits | cat_num["Any"])
 
     # We don't want the lookup table to be too large so choose a reasonable
     # cutoff. 0x20000 is selected because most of the range table entries are
@@ -305,83 +352,364 @@ def emit_break_module(f, break_table, break_cats, name):
 
     lookup_interval = round(lookup_value_cutoff / lookup_table_len)
 
-    # Lookup table is a mapping from `character code / lookup_interval` to
-    # the index in the range table that covers the `character code`.
+    # Lookup table is a mapping from `character code / lookup_interval` to the index
+    # in the range table of the entry that covers that `character code`.
     lookup_table = [0] * lookup_table_len
     j = 0
     for i in range(0, lookup_table_len):
-      lookup_from = i * lookup_interval
-      while j < len(break_table):
-        (_, entry_to, _) = break_table[j]
-        if entry_to >= lookup_from:
-          break
-        j += 1
-      lookup_table[i] = j
+        cp = i * lookup_interval
+        while j + 1 < len(packed) and (packed[j + 1] >> cat_bits) <= cp:
+            j += 1
+        lookup_table[i] = j
 
-    break_cats.append("Any")
-    break_cats.sort()
+    f.write("""pub mod %s {
+    pub use self::%sCat::*;
+
+    #[allow(non_camel_case_types)]
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    pub enum %sCat {
+""" % (name, Name, Name))
     for cat in break_cats:
-        f.write(("        %sC_" % Name[0]) + cat + ",\n")
+        f.write("        %sC_%s,\n" % (Prefix, cat))
     f.write("""    }
 
-    fn bsearch_range_value_table(c: char, r: &[(char, char, %sCat)], default_lower: u32, default_upper: u32) -> (u32, u32, %sCat) {
-        use core::cmp::Ordering::{Equal, Less, Greater};
-        match r.binary_search_by(|&(lo, hi, _)| {
-            if lo <= c && c <= hi { Equal }
-            else if hi < c { Less }
-            else { Greater }
-        }) {
-            Ok(idx) => {
-                let (lower, upper, cat) = r[idx];
-                (lower as u32, upper as u32, cat)
-            }
-            Err(idx) => {
-                (
-                    if idx > 0 { r[idx-1].1 as u32 + 1 } else { default_lower },
-                    r.get(idx).map(|c|c.0 as u32 - 1).unwrap_or(default_upper),
-                    %sC_Any,
-                )
-            }
-        }
-    }
+    /// Bits reserved for the category in each `%s_cat_table` entry.
+    const CAT_BITS: u32 = %d;
+
+    /// Category of a `%s_cat_table` entry, indexed by its low `CAT_BITS` bits.
+    ///
+    /// Padded out to `1 << CAT_BITS` entries so that masking an entry proves the index in bounds.
+    /// `CATS[i] as usize == i`, so it doubles as an enumeration of every category.
+    pub const CATS: [%sCat; 1 << CAT_BITS] = [
+        %s,
+    ];
 
     pub fn %s_category(c: char) -> (u32, u32, %sCat) {
-        // Perform a quick O(1) lookup in a precomputed table to determine
-        // the slice of the range table to search in.
-        let lookup_interval = 0x%x;
-        let idx = (c as u32 / lookup_interval) as usize;
-        let range = %s_cat_lookup.get(idx..(idx + 2)).map_or(
-          // If the `idx` is outside of the precomputed table - use the slice
-          // starting from the last covered index in the precomputed table and
-          // ending with the length of the range table.
-          %d..%d,
-          |r| (r[0] as usize)..((r[1] + 1) as usize)
-        );
+        let c = c as u32;
 
-        // Compute pessimistic default lower and upper bounds on the category.
-        // If character doesn't map to any range and there is no adjacent range
-        // in the table slice - these bounds has to apply.
-        let lower = idx as u32 * lookup_interval;
-        let upper = lower + lookup_interval - 1;
-        bsearch_range_value_table(c, &%s_cat_table[range], lower, upper)
+        // Perform a quick O(1) lookup in a precomputed table 
+        // to determine the slice of the range table to search in.
+        let lookup_interval = 0x%x;
+        let idx = (c / lookup_interval) as usize;
+        let (lo, hi) = match %s_cat_lookup.get(idx..(idx + 2)) {
+            Some(r) => (r[0] as usize, r[1] as usize + 1),
+            // If the `idx` is outside of the precomputed table - use the slice
+            // starting from the last covered index in the precomputed table and
+            // ending with the length of the range table.
+            None => (%d, %s_cat_table.len()),
+        };
+
+        // The ranges tile the codepoint space,
+        // so the entry covering `c` is the last one that starts at or before it.
+        // `%s_cat_lookup` guarantees that the entry at `lo` starts at or before `c`, so the offset is never zero.
+        let i = lo + %s_cat_table[lo..hi].partition_point(|&e| (e >> CAT_BITS) <= c) - 1;
+        let entry = %s_cat_table[i];
+        let upper = match %s_cat_table.get(i + 1) {
+            Some(&next) => (next >> CAT_BITS) - 1,
+            None => 0x%X,
+        };
+        (
+            entry >> CAT_BITS,
+            upper,
+            CATS[(entry & ((1 << CAT_BITS) - 1)) as usize],
+        )
     }
 
-""" % (Name, Name, Name[0], name, Name, lookup_interval, name, j, len(break_table), name))
+""" % (name, cat_bits,
+       name, Name,
+       ",\n        ".join("%sC_%s" % (Prefix, break_cats[i]) if i < len(break_cats) else "%sC_Any" % Prefix
+                 for i in range(1 << cat_bits)),
+       name, Name, lookup_interval, name, lookup_table[-1], name, name, name, name, name,
+       MAX_CODEPOINT))
 
-
-    if len(break_table) <= 0xff:
-      lookup_type = "u8"
-    elif len(break_table) <= 0xffff:
-      lookup_type = "u16"
+    if len(packed) <= 0x100:
+        lookup_type = "u8"
+    elif len(packed) <= 0x10000:
+        lookup_type = "u16"
     else:
-      lookup_type = "u32"
+        lookup_type = "u32"
 
     emit_table(f, "%s_cat_lookup" % name, lookup_table, "&[%s]" % lookup_type,
         pfun=lambda x: "%d" % x,
         is_pub=False, is_const=True)
 
-    emit_table(f, "%s_cat_table" % name, break_table, "&[(char, char, %sCat)]" % Name,
-        pfun=lambda x: "(%s,%s,%sC_%s)" % (escape_char(x[0]), escape_char(x[1]), Name[0], x[2]),
+    # One entry per range: `start << CAT_BITS | category`, sorted by start.
+    emit_table(f, "%s_cat_table" % name, packed, "&[u32]",
+        pfun=lambda x: "0x%X" % x,
+        is_pub=False, is_const=True)
+    f.write("}\n")
+
+def emit_nibble_window(f, name, values, per_line=24):
+    """Emit a direct-indexed category window, two categories per byte.
+
+    There are 16 `Grapheme_Cluster_Break` categories, so one fits in a nibble
+    and the window costs half of what a byte per codepoint would.
+
+    Unpacking is a shift and a mask at the use site, with no second load,
+    which a two-level trie would need.
+
+    A byte string keeps the generated file compact and is a single token for rustc,
+    and the fixed-size array type lets the bounds check be avoidable at the call site.
+    """
+    assert all(0 <= v <= 0xf for v in values), "a category does not fit in a nibble"
+    assert len(values) % 2 == 0, "window length must be even to pack in pairs"
+    packed = [values[i] | values[i + 1] << 4 for i in range(0, len(values), 2)]
+    f.write("    const %s: &[u8; %d] = b\"" % (name, len(packed)))
+    for i in range(0, len(packed), per_line):
+        if i:
+            f.write("\\\n        ")
+        f.write("".join("\\x%02x" % v for v in packed[i:i + per_line]))
+    f.write("\";\n\n")
+
+def check_incb_derivable(catmap, cat_index, incb_extend, incb_linker):
+    """Check that `InCB=Extend` can be recovered from the grapheme category.
+
+    `InCB=Extend` is `[gcb=Extend gcb=ZWJ] - InCB=Linker - U+200C`,
+    which is why no range table is emitted for it and `grapheme::is_incb_extend` in `src/grapheme.rs`.
+
+    Derives it instead. Also checks that every `InCB=Linker` is Extend or ZWJ,
+    which is what lets the cursor skip the linker test for every other category.
+
+    A future Unicode version that breaks either assumption fails loudly here.
+    """
+    allowed = {cat_index["Extend"], cat_index["ZWJ"]}
+    for (label, ranges) in (("InCB=Extend", incb_extend), ("InCB=Linker", incb_linker)):
+        for (lo, hi) in ranges:
+            for cp in range(lo, hi + 1):
+                if catmap[cp] not in allowed:
+                    raise AssertionError(
+                        "U+%04X is %s but its Grapheme_Cluster_Break is not Extend or ZWJ; "
+                        "the fast path in src/grapheme.rs assumes otherwise" % (cp, label))
+
+    linkers = {cp for (lo, hi) in incb_linker for cp in range(lo, hi + 1)}
+    actual = {cp for (lo, hi) in incb_extend for cp in range(lo, hi + 1)}
+    derived = {cp for cp in range(0, 0x110000)
+               if catmap[cp] in allowed and cp not in linkers and cp != 0x200C}
+    if actual != derived:
+        raise AssertionError(
+            "InCB=Extend is no longer [gcb=Extend gcb=ZWJ] - InCB=Linker - U+200C, so "
+            "grapheme::is_incb_extend would be wrong: missing=%s extra=%s"
+            % ([hex(c) for c in sorted(actual - derived)[:8]],
+               [hex(c) for c in sorted(derived - actual)[:8]]))
+
+def emit_grapheme_module(f, break_table, break_cats, incb_extend, incb_linker):
+    """Emit the grapheme module with direct-indexed category windows.
+
+    Unlike the word/sentence/emoji modules this does not binary-search the whole range table.
+
+    Real text lives almost entirely inside the direct windows or the arithmetic shortcuts,
+    so the common case is a single indexed load.
+    """
+    cats = sorted(break_cats + ["Any"])
+    # The pairwise rule table in src/grapheme.rs indexes categories with 4 bits,
+    # and the residual table packs one into GRAPHEME_CAT_BITS.
+    assert len(cats) <= 16, \
+        "too many Grapheme_Cluster_Break categories for a 4-bit index: %s" % cats
+    assert len(cats) <= (1 << GRAPHEME_CAT_BITS), "category does not fit the residual packing"
+    assert cats[0] == "Any", "GC_Any must be category 0, the residual table's default"
+    cat_index = {name: i for i, name in enumerate(cats)}
+
+    # Dense codepoint -> category map, defaulting to Any.
+    catmap = bytearray(0x110000)
+    for (lo, hi, cat) in break_table:
+        v = cat_index[cat]
+        for cp in range(lo, hi + 1):
+            catmap[cp] = v
+
+    def check(cond, msg):
+        if not cond:
+            raise AssertionError(
+                "the grapheme category lookup shortcuts in scripts/unicode.py are stale "
+                "for Unicode %s: %s" % (UNICODE_VERSION_NUMBER, msg))
+
+    # The CJK..Vai gap is resolved with two equality tests.
+    gap = {cp for cp in range(GRAPHEME_T0_END, GRAPHEME_T1_LO)
+           if catmap[cp] != cat_index["Any"]}
+    check(gap == {0x3297, 0x3299},
+          "expected only U+3297 and U+3299 to be non-Any in [%#x, %#x), found %s"
+          % (GRAPHEME_T0_END, GRAPHEME_T1_LO, sorted(hex(c) for c in gap)))
+    check(all(catmap[cp] == cat_index["Extended_Pictographic"] for cp in gap),
+          "U+3297/U+3299 are no longer Extended_Pictographic")
+
+    # Hangul syllables are LV at every 28th codepoint and LVT otherwise.
+    for cp in range(GRAPHEME_HANGUL_LO, GRAPHEME_HANGUL_HI):
+        want = "LV" if (cp - GRAPHEME_HANGUL_LO) % 28 == 0 else "LVT"
+        check(catmap[cp] == cat_index[want],
+              "U+%04X is not %s" % (cp, want))
+
+    # Variation selectors are all Extend.
+    for cp in range(GRAPHEME_VS_LO, GRAPHEME_VS_HI):
+        check(catmap[cp] == cat_index["Extend"], "U+%04X is not Extend" % cp)
+
+    check_incb_derivable(catmap, cat_index, incb_extend, incb_linker)
+
+    # Everything the windows and the shortcuts do not cover.
+    residual_regions = [
+        (GRAPHEME_HANGUL_HI, GRAPHEME_VS_LO),
+        (GRAPHEME_VS_HI, GRAPHEME_T2_LO),
+        (GRAPHEME_T2_HI, 0x110000),
+    ]
+    residual = []
+    for (rlo, rhi) in residual_regions:
+        cp = rlo
+        while cp < rhi:
+            v = catmap[cp]
+            if v == cat_index["Any"]:
+                cp += 1
+                continue
+            start = cp
+            while cp < rhi and catmap[cp] == v:
+                cp += 1
+            residual.append((start, cp - 1, v))
+    for (_, end, v) in residual:
+        assert end >> (32 - GRAPHEME_CAT_BITS) == 0 and v < (1 << GRAPHEME_CAT_BITS)
+
+    # Replay the lookup that is about to be emitted over every codepoint and
+    # check it against the range table it is derived from. This catches an
+    # off-by-one in a window bound or in the residual table, which would
+    # otherwise only show up as a wrong break somewhere in the middle of a script
+    # nobody tests.
+    packed = [(start, end << GRAPHEME_CAT_BITS | v) for (start, end, v) in residual]
+    def emitted_lookup(cp):
+        if cp < GRAPHEME_T0_END:
+            return catmap[cp]  # t0
+        if cp < GRAPHEME_T1_LO:
+            return cat_index["Extended_Pictographic"] if cp in (0x3297, 0x3299) \
+                else cat_index["Any"]
+        if cp < GRAPHEME_T1_HI:
+            return catmap[cp]  # t1
+        if cp < GRAPHEME_HANGUL_HI:
+            return cat_index["LV"] if (cp - GRAPHEME_HANGUL_LO) % 28 == 0 else cat_index["LVT"]
+        if GRAPHEME_T2_LO <= cp < GRAPHEME_T2_HI:
+            return catmap[cp]  # t2
+        if cp >> 4 == GRAPHEME_VS_LO >> 4:
+            return cat_index["Extend"]
+        lo, hi = 0, len(packed)
+        while lo < hi:
+            mid = (lo + hi) // 2
+            (start, pk) = packed[mid]
+            if cp < start:
+                hi = mid
+            elif cp > pk >> GRAPHEME_CAT_BITS:
+                lo = mid + 1
+            else:
+                return pk & ((1 << GRAPHEME_CAT_BITS) - 1)
+        return cat_index["Any"]
+
+    for cp in range(0, 0x110000):
+        check(emitted_lookup(cp) == catmap[cp],
+              "the emitted lookup disagrees with the range table at U+%04X "
+              "(got %d, want %d)" % (cp, emitted_lookup(cp), catmap[cp]))
+    windows = (GRAPHEME_T0_END + (GRAPHEME_T1_HI - GRAPHEME_T1_LO)
+               + (GRAPHEME_T2_HI - GRAPHEME_T2_LO)) // 2
+    sys.stderr.write(
+        "grapheme: %d packed bytes + %d residual ranges (%d B), verified over all "
+        "%d codepoints\n" % (windows, len(residual), len(residual) * 8, 0x110000))
+
+    f.write("""pub mod grapheme {
+    pub use self::GraphemeCat::*;
+
+    /// `Grapheme_Cluster_Break` property values, plus `InCB=Consonant` folded in
+    /// as a category of its own since it never overlaps another one.
+    ///
+    /// The discriminants are the values stored in the tables below and are the
+    /// index space of the pairwise rule table in `src/grapheme.rs`.
+    #[allow(non_camel_case_types)]
+    #[repr(u8)]
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    pub enum GraphemeCat {
+""")
+    for cat in cats:
+        f.write("        GC_%s = %d,\n" % (cat, cat_index[cat]))
+    f.write("    }\n\n")
+
+    f.write("    /// Every `GraphemeCat` in discriminant order, so `CATS[i] as u8 == i`.\n")
+    f.write("    pub const CATS: [GraphemeCat; 16] = [\n        ")
+    f.write(",\n        ".join(["GC_%s" % c for c in cats] + ["GC_Any"] * (16 - len(cats))))
+    f.write(",\n    ];\n\n")
+
+    f.write("""    /// Category at index `i` of a window that packs two per byte, low nibble first.
+    #[inline]
+    fn nibble<const N: usize>(window: &[u8; N], i: u32) -> u8 {
+        window[(i >> 1) as usize] >> ((i & 1) << 2) & 15
+    }
+
+    /// `Grapheme_Cluster_Break` of `c`, as a raw category byte.
+    ///
+    /// This is the hot path of grapheme cluster segmentation: everything below
+    /// U+30A0 (which is every script whose clusters are non-trivial, plus latin,
+    /// cyrillic and the kana) and the whole emoji block are a single load, the
+    /// CJK ideographs and the hangul syllables are arithmetic, and only the rare
+    /// tail reaches a binary search.
+    #[inline]
+    pub fn grapheme_category_raw(c: char) -> u8 {
+        let cp = c as u32;
+        if cp < 0x%X {
+            return nibble(grapheme_cat_t0, cp);
+        }
+        // CJK through Vai
+        if cp < 0x%X {
+            return if cp == 0x3297 || cp == 0x3299 { %d } else { %d };
+        }
+        if cp < 0x%X {
+            return nibble(grapheme_cat_t1, cp - 0x%X);
+        }
+        // Hangul syllables: LV at every 28th, LVT otherwise
+        if cp < 0x%X {
+            return if (cp - 0x%X) %% 28 == 0 { %d } else { %d };
+        }
+        if (0x%X..0x%X).contains(&cp) {
+            return nibble(grapheme_cat_t2, cp - 0x%X);
+        }
+        // Variation selectors
+        if cp >> 4 == 0x%X {
+            return %d;
+        }
+        grapheme_category_residual(cp)
+    }
+
+    /// `Grapheme_Cluster_Break` of `c`.
+    #[inline]
+    pub fn grapheme_category(c: char) -> GraphemeCat {
+        CATS[(grapheme_category_raw(c) & 15) as usize]
+    }
+
+    /// Cold half of [`grapheme_category_raw`], kept out of line so the hot half
+    /// stays small enough to inline.
+    fn grapheme_category_residual(cp: u32) -> u8 {
+        use core::cmp::Ordering::{Equal, Greater, Less};
+        match grapheme_cat_residual.binary_search_by(|&(start, packed)| {
+            if cp < start {
+                Greater
+            } else if cp > packed >> %d {
+                Less
+            } else {
+                Equal
+            }
+        }) {
+            core::result::Result::Ok(idx) => (grapheme_cat_residual[idx].1 & %d) as u8,
+            core::result::Result::Err(_) => %d,
+        }
+    }
+
+""" % (
+        GRAPHEME_T0_END,
+        GRAPHEME_T1_LO, cat_index["Extended_Pictographic"], cat_index["Any"],
+        GRAPHEME_T1_HI, GRAPHEME_T1_LO,
+        GRAPHEME_HANGUL_HI, GRAPHEME_HANGUL_LO, cat_index["LV"], cat_index["LVT"],
+        GRAPHEME_T2_LO, GRAPHEME_T2_HI, GRAPHEME_T2_LO,
+        GRAPHEME_VS_LO >> 4, cat_index["Extend"],
+        GRAPHEME_CAT_BITS, (1 << GRAPHEME_CAT_BITS) - 1, cat_index["Any"],
+    ))
+
+    emit_nibble_window(f, "grapheme_cat_t0", catmap[0:GRAPHEME_T0_END])
+    emit_nibble_window(f, "grapheme_cat_t1", catmap[GRAPHEME_T1_LO:GRAPHEME_T1_HI])
+    emit_nibble_window(f, "grapheme_cat_t2", catmap[GRAPHEME_T2_LO:GRAPHEME_T2_HI])
+
+    f.write("    /// Ranges outside the direct windows, as `(start, end << %d | category)`.\n"
+            % GRAPHEME_CAT_BITS)
+    emit_table(f, "grapheme_cat_residual", residual, "&[(u32, u32)]",
+        pfun=lambda x: "(0x%x,0x%x)" % (x[0], x[1] << GRAPHEME_CAT_BITS | x[2]),
         is_pub=False, is_const=True)
     f.write("}\n")
 
@@ -408,7 +736,7 @@ const UNICODE_VERSION_U8: (u8, u8, u8) = (%s, %s, %s);
 
         emit_util_mod(rf)
         for (name, cat, pfuns) in ("general_category", gencats, ["N"]), \
-                                  ("derived_property", derived, ["Alphabetic", ("InCB", "Extend")]):
+                                  ("derived_property", derived, ["Alphabetic"]):
             emit_property_module(rf, name, cat, pfuns)
 
         rf.write("""pub fn is_incb_linker(c: char) -> bool {
@@ -417,7 +745,7 @@ const UNICODE_VERSION_U8: (u8, u8, u8) = (%s, %s, %s);
         for (lo, hi) in derived[("InCB", "Linker")]:
             rf.write(f" | '\\u{{{lo:X}}}'")
             if lo != hi:
-                rf.write(f"..'\\u{{{lo:X}}}'")
+                rf.write(f"..='\\u{{{hi:X}}}'")
         
         rf.write(")\n}\n\n")
 
@@ -444,7 +772,8 @@ const UNICODE_VERSION_U8: (u8, u8, u8) = (%s, %s, %s);
             if chars[0] <= last:
                 raise "Grapheme tables and Extended_Pictographic values overlap; need to store these separately!"
             last = chars[1]
-        emit_break_module(rf, grapheme_table, list(grapheme_cats.keys()), "grapheme")
+        emit_grapheme_module(rf, grapheme_table, list(grapheme_cats.keys()),
+                             derived[("InCB", "Extend")], derived[("InCB", "Linker")])
         rf.write("\n")
 
         word_cats = load_properties("auxiliary/WordBreakProperty.txt")
