@@ -284,6 +284,30 @@ fn check_pair(before: GraphemeCat, after: GraphemeCat) -> PairResult {
     }
 }
 
+/// Whether `ch`, whose grapheme category is `cat`, has `Indic_Conjunct_Break=Extend`.
+///
+/// `InCB=Extend` is defined as
+/// `[\p{gcb=Extend} \p{gcb=ZWJ}] - \p{InCB=Linker} - \p{InCB=Consonant} - U+200C`,
+/// and no `InCB=Consonant` is `gcb=Extend` or `gcb=ZWJ`,
+/// so the grapheme category the caller already has, plus two equality tests, decides it.
+///
+/// That saves a binary search over a range table of its own for every codepoint the cursor walks over.
+///
+/// `scripts/unicode.py` checks the derivation against the UCD when it regenerates `src/tables.rs`,
+/// so a future Unicode version cannot silently invalidate it.
+#[inline]
+fn is_incb_extend(cat: GraphemeCat, ch: char) -> bool {
+    // ZWNJ is `gcb=Extend` but `InCB=None`.
+    may_be_incb(cat) && ch != '\u{200c}' && !crate::tables::is_incb_linker(ch)
+}
+
+/// Both `InCB=Linker` and `InCB=Extend` are subsets of `gcb=Extend` and `gcb=ZWJ`,
+/// so any other category rules out both roles without inspecting the codepoint.
+#[inline]
+fn may_be_incb(cat: GraphemeCat) -> bool {
+    matches!(cat, GraphemeCat::GC_Extend | GraphemeCat::GC_ZWJ)
+}
+
 impl GraphemeCursor {
     /// Create a new cursor. The string and initial offset are given at creation
     /// time, but the contents of the string are not. The `is_extended` parameter
@@ -492,7 +516,7 @@ impl GraphemeCursor {
                 // We found an InCB linker
                 incb_linker_count += 1;
                 self.incb_linker_count = Some(incb_linker_count);
-            } else if tables::derived_property::InCB_Extend(ch) {
+            } else if is_incb_extend(self.grapheme_category(ch), ch) {
                 // We ignore InCB extends, continue
             } else {
                 // Prev character is neither linker nor extend, break suppressed iff it's InCB=Consonant
@@ -724,10 +748,11 @@ impl GraphemeCursor {
                 if self.cat_before.is_none() {
                     self.cat_before = Some(self.grapheme_category(ch));
                 }
-                if crate::tables::is_incb_linker(ch) {
-                    self.incb_linker_count = Some(self.incb_linker_count.map_or(1, |c| c + 1));
-                } else if !crate::tables::derived_property::InCB_Extend(ch) {
+                // ZWNJ is the one `gcb=Extend` that is `InCB=None`.
+                if !may_be_incb(self.cat_before.unwrap()) || ch == '\u{200c}' {
                     self.incb_linker_count = Some(0);
+                } else if crate::tables::is_incb_linker(ch) {
+                    self.incb_linker_count = Some(self.incb_linker_count.map_or(1, |c| c + 1));
                 }
                 if self.cat_before.unwrap() == GraphemeCat::GC_Regional_Indicator {
                     self.ris_count = self.ris_count.map(|c| c + 1);
@@ -816,7 +841,7 @@ impl GraphemeCursor {
                     self.incb_linker_count =
                         if incb_linker_count > 0 && crate::tables::is_incb_linker(ch) {
                             Some(incb_linker_count - 1)
-                        } else if crate::tables::derived_property::InCB_Extend(ch) {
+                        } else if is_incb_extend(self.grapheme_category(ch), ch) {
                             Some(incb_linker_count)
                         } else {
                             None

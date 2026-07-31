@@ -283,6 +283,41 @@ def emit_property_module(f, mod, tbl, emit: "list[str | tuple[str, str]]"):
         f.write("    }\n\n")
     f.write("}\n\n")
 
+def check_incb_derivable(grapheme_table, incb_extend, incb_linker):
+    """Check that `InCB=Extend` can be recovered from the Grapheme_Cluster_Break category.
+
+    `grapheme::is_incb_extend` in src/grapheme.rs derives it as
+    `[\\p{gcb=Extend} \\p{gcb=ZWJ}] - \\p{InCB=Linker} - U+200C` instead of carrying a range table for it,
+    which also lets the cursor skip the lookup for every category that is neither `Extend` nor `ZWJ`.
+
+    Both facts are checked here so that a Unicode version which invalidates
+    either fails loudly instead of silently mis-segmenting Indic text.
+    """
+    extend_or_zwj = set()
+    for (lo, hi, cat) in grapheme_table:
+        if cat in ("Extend", "ZWJ"):
+            extend_or_zwj.update(range(lo, hi + 1))
+    linkers = {cp for (lo, hi) in incb_linker for cp in range(lo, hi + 1)}
+    actual = {cp for (lo, hi) in incb_extend for cp in range(lo, hi + 1)}
+
+    stray = sorted(linkers - extend_or_zwj)
+    if stray:
+        raise AssertionError(
+            "InCB=Linker is no longer a subset of gcb=Extend and gcb=ZWJ (%s); "
+            "grapheme::is_incb_extend in src/grapheme.rs would miss it"
+            % [hex(c) for c in stray[:8]])
+
+    derived = extend_or_zwj - linkers - {0x200C}
+    if actual != derived:
+        raise AssertionError(
+            "InCB=Extend is no longer [gcb=Extend gcb=ZWJ] - InCB=Linker - U+200C; "
+            "grapheme::is_incb_extend in src/grapheme.rs would be wrong. missing=%s extra=%s"
+            % ([hex(c) for c in sorted(actual - derived)[:8]],
+               [hex(c) for c in sorted(derived - actual)[:8]]))
+
+    sys.stderr.write(
+        "InCB=Extend: %d codepoints, all derivable from the grapheme category\n" % len(actual))
+
 def emit_break_module(f, break_table, break_cats, name):
     Name = name.capitalize()
     f.write("""pub mod %s {
@@ -408,7 +443,7 @@ const UNICODE_VERSION_U8: (u8, u8, u8) = (%s, %s, %s);
 
         emit_util_mod(rf)
         for (name, cat, pfuns) in ("general_category", gencats, ["N"]), \
-                                  ("derived_property", derived, ["Alphabetic", ("InCB", "Extend")]):
+                                  ("derived_property", derived, ["Alphabetic"]):
             emit_property_module(rf, name, cat, pfuns)
 
         rf.write("""pub fn is_incb_linker(c: char) -> bool {
@@ -444,6 +479,8 @@ const UNICODE_VERSION_U8: (u8, u8, u8) = (%s, %s, %s);
             if chars[0] <= last:
                 raise "Grapheme tables and Extended_Pictographic values overlap; need to store these separately!"
             last = chars[1]
+        check_incb_derivable(grapheme_table, derived[("InCB", "Extend")],
+                             derived[("InCB", "Linker")])
         emit_break_module(rf, grapheme_table, list(grapheme_cats.keys()), "grapheme")
         rf.write("\n")
 
