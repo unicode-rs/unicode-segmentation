@@ -318,7 +318,114 @@ def check_incb_derivable(grapheme_table, incb_extend, incb_linker):
     sys.stderr.write(
         "InCB=Extend: %d codepoints, all derivable from the grapheme category\n" % len(actual))
 
-def emit_break_module(f, break_table, break_cats, name):
+def strip_grapheme_derived_ranges(grapheme_table):
+    """Verify and strip ranges that the generated `grapheme_category`
+    derives at runtime via arithmetic, alongside its ASCII fast path.
+
+    The generated `grapheme_cat_table` omits them,
+    so every shortcut is checked against the parsed UCD data here.
+
+    Returns `(filtered_table, fast_path)`, where `fast_path` is Rust source injected
+    at the top of the generated `grapheme_category` function.
+
+    Each branch returns `GraphemeCategoryResult::Fast(cat)`,
+    telling the caller in `src/grapheme.rs` to skip its range cache.
+    """
+
+    derived = (
+        (0, 0x7F),        # ASCII: Control/LF/CR/Any (see grapheme_category)
+        (0x30A0, 0xA660), # All Any, except U+3297/U+3299 (Extended_Pictographic)
+        (0xAC00, 0xD7A4), # Hangul syllables, LV every 28th and LVT otherwise
+        (0xFE00, 0xFE10), # Variation selectors, all Extend
+    )
+    (_, GRAPHEME_ASCII_HI) = derived[0]
+    (GRAPHEME_CJK_GAP_LO, GRAPHEME_CJK_GAP_HI) = derived[1]
+    (GRAPHEME_HANGUL_LO, GRAPHEME_HANGUL_HI) = derived[2]
+    (GRAPHEME_VS_LO, GRAPHEME_VS_HI) = derived[3]
+
+    catmap = {}
+    for (lo, hi, cat) in grapheme_table:
+        for cp in range(lo, hi + 1):
+            catmap[cp] = cat
+
+    def check(cond, msg):
+        if not cond:
+            raise AssertionError(
+                "the inline shortcuts in src/grapheme.rs are stale "
+                f"for Unicode {UNICODE_VERSION_NUMBER}: {msg}"
+            )
+
+    # ASCII: [0x20, 0x7E] is Any, U+000A is LF, U+000D is CR, the rest of [0x00, 0x7E] is Control.
+    for cp in range(GRAPHEME_ASCII_HI):
+        if cp == 0x0A:
+            want = "LF"
+        elif cp == 0x0D:
+            want = "CR"
+        elif 0x20 <= cp < GRAPHEME_ASCII_HI:
+            want = "Any"
+        else:
+            want = "Control"
+        got = catmap.get(cp, "Any")
+        check(got == want, f"U+{cp:04X} is {got}, expected {want}")
+
+    # CJK gap: all Any except U+3297 and U+3299, which are Extended_Pictographic.
+    non_any = {cp for cp in range(GRAPHEME_CJK_GAP_LO, GRAPHEME_CJK_GAP_HI)
+               if catmap.get(cp, "Any") != "Any"}
+    check(non_any == {0x3297, 0x3299},
+          f"expected only U+3297 and U+3299 to be non-Any in [{GRAPHEME_CJK_GAP_LO:#x}, {GRAPHEME_CJK_GAP_HI:#x}),"
+          f"found {sorted(hex(c) for c in non_any)}")
+    check(all(catmap[cp] == "Extended_Pictographic" for cp in non_any),
+          "U+3297/U+3299 are no longer Extended_Pictographic")
+
+    # Hangul syllables: LV at every 28th codepoint, LVT otherwise.
+    for cp in range(GRAPHEME_HANGUL_LO, GRAPHEME_HANGUL_HI):
+        want = "LV" if (cp - GRAPHEME_HANGUL_LO) % 28 == 0 else "LVT"
+        got = catmap.get(cp, "Any")
+        check(got == want, f"U+{cp:04X} is {got}, expected {want}")
+
+    # Variation selectors: all Extend.
+    for cp in range(GRAPHEME_VS_LO, GRAPHEME_VS_HI):
+        got = catmap.get(cp, "Any")
+        check(got == "Extend", f"U+{cp:04X} is {got}, expected Extend")
+
+    filtered = [(lo, hi, cat) for (lo, hi, cat) in grapheme_table
+                if not any(dlo <= lo and hi < dhi for (dlo, dhi) in derived)]
+
+    omitted = sum(hi - lo + 1 for (lo, hi, _) in grapheme_table
+                  for (dlo, dhi) in derived if dlo <= lo and hi < dhi)
+    sys.stderr.write(
+        f"grapheme: {omitted} codepoints covered by runtime-derived ranges, "
+        "omitted from the generated table\n")
+
+    fast_path = """
+        // ASCII: Control/LF/CR/Any — derived from the codepoint value alone.
+        if c < 0x%X {
+            if ch == '\\n' { return Fast(GC_LF); }
+            if ch == '\\r' { return Fast(GC_CR); }
+            if ch >= '\\u{20}' { return Fast(GC_Any); }
+            return Fast(GC_Control);
+        }
+        // CJK through Vai: all Any except U+3297/U+3299 (Extended_Pictographic).
+        if (0x%X..0x%X).contains(&c) {
+            if ch == '\\u{3297}' || ch == '\\u{3299}' { return Fast(GC_Extended_Pictographic); }
+            return Fast(GC_Any);
+        }
+        // Hangul syllables: LV at every 28th from 0xAC00, LVT otherwise.
+        if (0x%X..0x%X).contains(&c) {
+            return Fast(if (c - 0xAC00) %% 28 == 0 { GC_LV } else { GC_LVT });
+        }
+        // Variation selectors: all Extend.
+        if (0x%X..0x%X).contains(&c) {
+            return Fast(GC_Extend);
+        }
+""" % (GRAPHEME_ASCII_HI,
+    GRAPHEME_CJK_GAP_LO, GRAPHEME_CJK_GAP_HI,
+    GRAPHEME_HANGUL_LO, GRAPHEME_HANGUL_HI,
+    GRAPHEME_VS_LO, GRAPHEME_VS_HI)
+
+    return filtered, fast_path
+
+def emit_break_module(f, break_table, break_cats, name, fast_path=""):
     Name = name.capitalize()
     f.write("""pub mod %s {
     use core::result::Result::{Ok, Err};
@@ -379,12 +486,41 @@ def emit_break_module(f, break_table, break_cats, name):
             }
         }
     }
+""" % (Name, Name, Name[0]))
 
-    pub fn %s_category(c: char) -> (u32, u32, %sCat) {
+    f.write("""
+    /// Result of [`%s_category`], distinguishing categories derived at runtime
+    /// (no range to cache) from those found by table lookup.
+    #[allow(dead_code)]
+    #[derive(Clone, Copy, Debug)]
+    pub enum %sCategoryResult {
+        /// Category derived from the codepoint value alone.
+        Fast(%sCat),
+        /// Category from a table lookup, with the range it covers for caching.
+        Table { lo: u32, hi: u32, cat: %sCat },
+    }
+
+    #[allow(dead_code)]
+    impl %sCategoryResult {
+        /// The resolved category, regardless of which path produced it.
+        #[inline]
+        pub fn cat(self) -> %sCat {
+            match self {
+                %sCategoryResult::Fast(cat) => cat,
+                %sCategoryResult::Table { cat, .. } => cat,
+            }
+        }
+    }
+
+    pub fn %s_category(ch: char) -> %sCategoryResult {
+        use self::%sCategoryResult::*;
+
+        let c = ch as u32;
+ %s
         // Perform a quick O(1) lookup in a precomputed table to determine
         // the slice of the range table to search in.
         let lookup_interval = 0x%x;
-        let idx = (c as u32 / lookup_interval) as usize;
+        let idx = (c / lookup_interval) as usize;
         let range = %s_cat_lookup.get(idx..(idx + 2)).map_or(
           // If the `idx` is outside of the precomputed table - use the slice
           // starting from the last covered index in the precomputed table and
@@ -398,10 +534,12 @@ def emit_break_module(f, break_table, break_cats, name):
         // in the table slice - these bounds has to apply.
         let lower = idx as u32 * lookup_interval;
         let upper = lower + lookup_interval - 1;
-        bsearch_range_value_table(c, &%s_cat_table[range], lower, upper)
+        let (lo, hi, cat) = bsearch_range_value_table(ch, &%s_cat_table[range], lower, upper);
+        Table { lo, hi, cat }
     }
 
-""" % (Name, Name, Name[0], name, Name, lookup_interval, name, j, len(break_table), name))
+""" % (name, Name, Name, Name, Name, Name, Name, Name, name, Name, Name,
+       fast_path, lookup_interval, name, j, len(break_table), name))
 
 
     if len(break_table) <= 0xff:
@@ -481,7 +619,9 @@ const UNICODE_VERSION_U8: (u8, u8, u8) = (%s, %s, %s);
             last = chars[1]
         check_incb_derivable(grapheme_table, derived[("InCB", "Extend")],
                              derived[("InCB", "Linker")])
-        emit_break_module(rf, grapheme_table, list(grapheme_cats.keys()), "grapheme")
+        grapheme_table, grapheme_fast_path = strip_grapheme_derived_ranges(grapheme_table)
+        emit_break_module(rf, grapheme_table, list(grapheme_cats.keys()), "grapheme",
+                          fast_path=grapheme_fast_path)
         rf.write("\n")
 
         word_cats = load_properties("auxiliary/WordBreakProperty.txt")
