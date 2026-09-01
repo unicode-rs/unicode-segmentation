@@ -8,7 +8,6 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use core::cmp;
 use core::iter::Filter;
 
 // All of the logic for forward iteration over sentences
@@ -376,8 +375,11 @@ impl<'a> Iterator for USentenceBounds<'a> {
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
+        // The inner iterator yields break positions, and a sentence spans two of
+        // them, so each bound is one less - saturating, because the inner lower
+        // bound is 0 for an empty string and `usize` subtraction would underflow.
         let (lower, upper) = self.iter.size_hint();
-        (cmp::max(0, lower - 1), upper.map(|u| cmp::max(0, u - 1)))
+        (lower.saturating_sub(1), upper.map(|u| u.saturating_sub(1)))
     }
 
     #[inline]
