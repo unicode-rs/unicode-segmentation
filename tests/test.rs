@@ -245,3 +245,82 @@ quickcheck! {
         a == s
     }
 }
+
+/// `Iterator::size_hint` must not panic, must report a lower bound no greater
+/// than its upper bound, and both must bracket the number of items the iterator
+/// yields. This drives every public iterator of the crate over a corpus that
+/// leads with the empty string, which is the input on which a bound computed by
+/// subtraction underflows.
+#[test]
+fn test_size_hint_is_a_valid_bound() {
+    use crate::testdata::{TEST_SAME, TEST_SENTENCE, TEST_WORD};
+
+    fn check<I: Iterator>(label: &str, s: &str, it: I, count: usize) {
+        let (lo, hi) = it.size_hint();
+        assert!(
+            lo <= count,
+            "{}: size_hint lower {} exceeds the {} items yielded on {:?}",
+            label,
+            lo,
+            count,
+            s
+        );
+        if let Some(hi) = hi {
+            assert!(
+                lo <= hi,
+                "{}: size_hint lower {} exceeds upper {} on {:?}",
+                label,
+                lo,
+                hi,
+                s
+            );
+            assert!(
+                count <= hi,
+                "{}: the {} items yielded exceed size_hint upper {} on {:?}",
+                label,
+                count,
+                hi,
+                s
+            );
+        }
+    }
+
+    macro_rules! check {
+        ($label:expr, $s:expr, $mk:expr) => {{
+            let mk = $mk;
+            let count = mk().count();
+            check($label, $s, mk(), count);
+        }};
+    }
+
+    let corpus = [
+        "",
+        " ",
+        "a",
+        "ab",
+        "\r\n",
+        "0",
+        "\u{1f600}",
+        "Mr. Fox jumped. [...] The dog was too lazy.",
+    ]
+    .iter()
+    .copied()
+    .chain(TEST_SAME.iter().map(|&(s, _)| s))
+    .chain(TEST_WORD.iter().map(|&(s, _)| s))
+    .chain(TEST_SENTENCE.iter().map(|&(s, _)| s));
+
+    for s in corpus {
+        check!("graphemes(true)", s, || s.graphemes(true));
+        check!("graphemes(false)", s, || s.graphemes(false));
+        check!("grapheme_indices(true)", s, || s.grapheme_indices(true));
+        check!("split_word_bounds", s, || s.split_word_bounds());
+        check!("split_word_bound_indices", s, || s
+            .split_word_bound_indices());
+        check!("unicode_words", s, || s.unicode_words());
+        check!("unicode_word_indices", s, || s.unicode_word_indices());
+        check!("split_sentence_bounds", s, || s.split_sentence_bounds());
+        check!("split_sentence_bound_indices", s, || s
+            .split_sentence_bound_indices());
+        check!("unicode_sentences", s, || s.unicode_sentences());
+    }
+}
