@@ -441,7 +441,12 @@ impl GraphemeCursor {
         use crate::tables::grapheme as gr;
         assert!(chunk_start.saturating_add(chunk.len()) == self.pre_context_offset.unwrap());
         self.pre_context_offset = None;
-        if self.is_extended && chunk_start + chunk.len() == self.offset {
+        // GB4 and GB5 come before GB9b, so a Control, CR or LF after the
+        // Prepend still breaks; only apply the GB9b shortcut when the
+        // following category cannot be decided by an earlier rule.
+        let after_breaks_first =
+            matches!(self.cat_after, Some(gr::GC_Control | gr::GC_CR | gr::GC_LF));
+        if self.is_extended && !after_breaks_first && chunk_start + chunk.len() == self.offset {
             let ch = chunk.chars().next_back().unwrap();
             if self.grapheme_category(ch) == gr::GC_Prepend {
                 self.decide(false); // GB9b
@@ -916,6 +921,29 @@ fn test_grapheme_cursor_chunk_start_require_precontext() {
     );
     c.provide_context(&s[..1], 0);
     assert_eq!(c.is_boundary(&s[1..], 1), Ok(false));
+}
+
+#[test]
+fn test_grapheme_cursor_prepend_before_control_on_chunk_start() {
+    // GB4 and GB5 take precedence over GB9b, so `Prepend` does not glue a
+    // following `Control`, `CR` or `LF` to itself.  GraphemeBreakTest.txt:
+    //     ÷ 06DD ÷ 000D ÷  # ÷ [0.2] ARABIC END OF AYAH (Prepend) ÷ [5.0] <CR> (CR) ÷ [0.3]
+    for s in ["\u{06dd}\r", "\u{06dd}\n", "\u{06dd}\0"] {
+        let prepend_len = "\u{06dd}".len();
+        // The whole-string answer, which the `Graphemes` iterator already gets right.
+        assert_eq!(
+            GraphemeCursor::new(prepend_len, s.len(), true).is_boundary(s, 0),
+            Ok(true)
+        );
+        // The same query answered from separate chunks must agree.
+        let mut c = GraphemeCursor::new(prepend_len, s.len(), true);
+        assert_eq!(
+            c.is_boundary(&s[prepend_len..], prepend_len),
+            Err(GraphemeIncomplete::PreContext(prepend_len))
+        );
+        c.provide_context(&s[..prepend_len], 0);
+        assert_eq!(c.is_boundary(&s[prepend_len..], prepend_len), Ok(true));
+    }
 }
 
 #[test]

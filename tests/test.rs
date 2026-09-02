@@ -45,6 +45,13 @@ fn test_graphemes() {
             "\u{1F938}\u{1F3FE}\u{1F3FE}",
             &["\u{1F938}\u{1F3FE}\u{1F3FE}"],
         ),
+        // GB4 and GB5 come before GB9b, so a Prepend does not join to a
+        // following Control, CR or LF. ARABIC END OF AYAH is Prepend.
+        ("\u{06DD}\r", &["\u{06DD}", "\r"]),
+        ("\u{06DD}\n", &["\u{06DD}", "\n"]),
+        ("\u{06DD}\u{0000}", &["\u{06DD}", "\u{0000}"]),
+        // ARABIC NUMBER SIGN, the other Prepend used in these tests
+        ("\u{0600}\r", &["\u{0600}", "\r"]),
     ];
 
     for &(s, g) in TEST_SAME.iter().chain(EXTRA_SAME) {
@@ -105,6 +112,55 @@ fn test_graphemes() {
         .collect::<Vec<&str>>();
     let b: &[_] = &["\r", "\r\n", "\n"];
     assert_eq!(gr, b);
+}
+
+// The `graphemes` iterator sees the whole string at once, so it always had these
+// right. `GraphemeCursor` answers the same question one chunk at a time, and
+// `provide_context` applied GB9b directly on a trailing Prepend without checking
+// whether GB4 or GB5 had already decided the boundary. Feeding the input one
+// codepoint at a time is the smallest way to reach that path.
+#[test]
+fn test_grapheme_cursor_chunked_matches_iterator() {
+    use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
+
+    const CASES: &[&str] = &[
+        "\u{06DD}\r",
+        "\u{06DD}\n",
+        "\u{06DD}\u{0000}",
+        "\u{0600}\r",
+        "\u{0600}a",
+        "a\u{06DD}\r",
+    ];
+
+    for &s in CASES {
+        for is_extended in [true, false] {
+            // Prepend is only joined in extended mode, so the expected
+            // boundaries have to come from the matching iterator.
+            let expected: Vec<usize> = std::iter::once(0)
+                .chain(
+                    UnicodeSegmentation::grapheme_indices(s, is_extended).map(|(i, g)| i + g.len()),
+                )
+                .collect();
+
+            for (offset, _) in s.char_indices().skip(1) {
+                let mut cursor = GraphemeCursor::new(offset, s.len(), is_extended);
+                let boundary = loop {
+                    match cursor.is_boundary(&s[offset..], offset) {
+                        Ok(b) => break b,
+                        Err(GraphemeIncomplete::PreContext(n)) => {
+                            cursor.provide_context(&s[..n], 0);
+                        }
+                        Err(e) => panic!("{:?} at {}: unexpected {:?}", s, offset, e),
+                    }
+                };
+                assert_eq!(
+                    boundary,
+                    expected.contains(&offset),
+                    "{s:?} extended={is_extended} offset={offset}"
+                );
+            }
+        }
+    }
 }
 
 #[test]
