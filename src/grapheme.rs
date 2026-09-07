@@ -346,29 +346,17 @@ impl GraphemeCursor {
 
     fn grapheme_category(&mut self, ch: char) -> GraphemeCat {
         use crate::tables::grapheme as gr;
-        use crate::tables::grapheme::GraphemeCat::*;
 
-        if ch <= '\u{7e}' {
-            // Special-case optimization for ascii, except U+007F.  This
-            // improves performance even for many primarily non-ascii texts,
-            // due to use of punctuation and white space characters from the
-            // ascii range.
-            if ch >= '\u{20}' {
-                GC_Any
-            } else if ch == '\n' {
-                GC_LF
-            } else if ch == '\r' {
-                GC_CR
-            } else {
-                GC_Control
+        match gr::grapheme_category(ch) {
+            gr::GraphemeCategoryResult::Fast(cat) => cat,
+            gr::GraphemeCategoryResult::Table { lo, hi, cat } => {
+                if (ch as u32) < self.grapheme_cat_cache.0
+                    || (ch as u32) > self.grapheme_cat_cache.1
+                {
+                    self.grapheme_cat_cache = (lo, hi, cat);
+                }
+                self.grapheme_cat_cache.2
             }
-        } else {
-            // If this char isn't within the cached range, update the cache to the
-            // range that includes it.
-            if (ch as u32) < self.grapheme_cat_cache.0 || (ch as u32) > self.grapheme_cat_cache.1 {
-                self.grapheme_cat_cache = gr::grapheme_category(ch);
-            }
-            self.grapheme_cat_cache.2
         }
     }
 
