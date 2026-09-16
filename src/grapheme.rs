@@ -451,7 +451,8 @@ impl GraphemeCursor {
         // following category cannot be decided by an earlier rule.
         let after_breaks_first =
             matches!(self.cat_after, Some(gr::GC_Control | gr::GC_CR | gr::GC_LF));
-        if self.is_extended && !after_breaks_first && chunk_start + chunk.len() == self.offset {
+        if self.is_extended && !after_breaks_first
+            && chunk_start.saturating_add(chunk.len()) == self.offset {
             let ch = chunk.chars().next_back().unwrap();
             if self.grapheme_category(ch) == gr::GC_Prepend {
                 self.decide(false); // GB9b
@@ -843,9 +844,12 @@ impl GraphemeCursor {
         if self.offset == chunk_start {
             return Err(GraphemeIncomplete::PrevChunk);
         }
-        let mut iter = chunk[..self.offset.saturating_sub(chunk_start)]
-            .chars()
-            .rev();
+        // Clamp to the chunk to avoid panicking on out-of-range offsets
+        // coming from a desynchronized or fuzzed caller (#119); the loop
+        // below then reports `PrevChunk` as for any chunk without a
+        // preceding boundary.
+        let end = self.offset.saturating_sub(chunk_start).min(chunk.len());
+        let mut iter = chunk[..end].chars().rev();
         let mut ch = iter.next().unwrap();
         loop {
             if self.offset == chunk_start {
