@@ -22,7 +22,7 @@ from __future__ import print_function
 import unicode, re, os, fileinput
 
 def load_test_data(f, optsplit=[]):
-    testRe1 = re.compile(r"^÷\s+([^\s].*[^\s])\s+÷\s+#\s+÷\s+\[0.2\].*?([÷×].*)\s+÷\s+\[0.3\]\s*$")
+    testRe1 = re.compile(r"^÷\s+([^\s].*[^\s])\s+÷\s+#\s+÷\s+\[1\.0\].*?([÷×].*)\s+÷\s+\[2\.0\]\s*$")
 
     unicode.fetch(f)
     data = []

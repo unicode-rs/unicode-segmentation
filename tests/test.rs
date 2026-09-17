@@ -31,6 +31,13 @@ fn test_graphemes() {
             &["\u{600}\u{20}", "\u{20}"],
             &["\u{600}", "\u{20}", "\u{20}"],
         ),
+        // GB9c (Unicode 18): Linker + Extend + Consonant → no break (extended), break (legacy)
+        // U+093C is GC_Extend, so GB9 joins it to the linker even in legacy
+        (
+            "\u{94d}\u{93c}\u{915}",
+            &["\u{94d}\u{93c}\u{915}"],
+            &["\u{94d}\u{93c}", "\u{915}"],
+        ),
     ];
 
     pub const EXTRA_SAME: &[(&str, &[&str])] = &[
@@ -136,6 +143,52 @@ fn test_grapheme_cursor_chunked_matches_iterator() {
         for is_extended in [true, false] {
             // Prepend is only joined in extended mode, so the expected
             // boundaries have to come from the matching iterator.
+            let expected: Vec<usize> = std::iter::once(0)
+                .chain(
+                    UnicodeSegmentation::grapheme_indices(s, is_extended).map(|(i, g)| i + g.len()),
+                )
+                .collect();
+
+            for (offset, _) in s.char_indices().skip(1) {
+                let mut cursor = GraphemeCursor::new(offset, s.len(), is_extended);
+                let boundary = loop {
+                    match cursor.is_boundary(&s[offset..], offset) {
+                        Ok(b) => break b,
+                        Err(GraphemeIncomplete::PreContext(n)) => {
+                            cursor.provide_context(&s[..n], 0);
+                        }
+                        Err(e) => panic!("{:?} at {}: unexpected {:?}", s, offset, e),
+                    }
+                };
+                assert_eq!(
+                    boundary,
+                    expected.contains(&offset),
+                    "{s:?} extended={is_extended} offset={offset}"
+                );
+            }
+        }
+    }
+}
+
+// Verify that `GraphemeCursor` chunked mode matches the `Graphemes` iterator
+// for GB9c (Indic conjunct break) sequences, especially when the linker,
+// extends, or consonant fall on chunk boundaries.
+#[test]
+fn test_grapheme_cursor_incb_consonant_chunked() {
+    use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
+
+    // U+094D = Virama (Linker, 3 bytes), U+0915 = Ka (Consonant, 3 bytes)
+    // U+093f = VowelSignI (Extend, 3 bytes)
+    const CASES: &[&str] = &[
+        "\u{94d}\u{915}",        // Linker + Consonant
+        "\u{94d}\u{93c}\u{915}", // Linker + Extend + Consonant
+        "\u{1cf5}\u{995}",       // Vedic Jihvamuliya + Consonant (Unicode 18)
+        "\u{1cf6}\u{9aa}",       // Vedic Upadhmaniya + Consonant (Unicode 18)
+        "\u{11a3a}\u{11a0b}",    // Zanabazar Square + Consonant (Unicode 18)
+    ];
+
+    for &s in CASES {
+        for is_extended in [true, false] {
             let expected: Vec<usize> = std::iter::once(0)
                 .chain(
                     UnicodeSegmentation::grapheme_indices(s, is_extended).map(|(i, g)| i + g.len()),
