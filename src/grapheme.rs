@@ -167,9 +167,8 @@ enum GraphemeState {
     /// It is known to be a boundary.
     Break,
     /// The codepoint after it has Indic_Conjunct_Break=Consonant,
-    /// so there is a break before so a boundary if it is preceded by another
-    /// InCB=Consonant follwoed by a sequence consisting of one or more InCB=Linker
-    /// and zero or more InCB = Extend (in any order).
+    /// so there is a break before it unless preceded (after skipping
+    /// zero or more InCB=Extend) by an InCB=Linker. (GB9c, Unicode 18)
     InCbConsonant,
     /// The codepoint after is a Regional Indicator Symbol, so a boundary iff
     /// it is preceded by an even number of RIS codepoints. (GB12, GB13)
@@ -253,9 +252,8 @@ enum PairResult {
     /// a break iff not in extended mode
     Extended,
     /// a break unless in extended mode and preceded by
-    /// a sequence of 0 or more InCB=Extend and one or more
-    /// InCB = Linker (in any order),
-    /// preceded by another InCB=Consonant
+    /// an InCB=Linker (possibly followed by InCB=Extend characters).
+    /// (GB9c, Unicode 18)
     InCbConsonant,
     /// a break if preceded by an even number of RIS
     Regional,
@@ -291,7 +289,12 @@ fn check_pair(before: GraphemeCat, after: GraphemeCat) -> PairResult {
 /// and no `InCB=Consonant` is `gcb=Extend` or `gcb=ZWJ`,
 /// so the grapheme category the caller already has, plus two equality tests, decides it.
 ///
-/// That saves a binary search over a range table of its own for every codepoint the cursor walks over.
+/// Note: since Unicode 18, some `InCB=Linker` characters (e.g. U+1CF5, U+1CF6, U+11A3A)
+/// have gcb categories other than `Extend` or `ZWJ`. This does not affect correctness:
+/// those characters are not in `InCB=Extend` either, and `is_incb_extend` correctly
+/// returns false for them because `may_be_incb` returns false for their gcb category.
+/// The callers that need to handle `InCB=Linker` (e.g. GB9c) must check
+/// `is_incb_linker` separately.
 ///
 /// `scripts/unicode.py` checks the derivation against the UCD when it regenerates `src/tables.rs`,
 /// so a future Unicode version cannot silently invalidate it.
@@ -301,8 +304,11 @@ fn is_incb_extend(cat: GraphemeCat, ch: char) -> bool {
     may_be_incb(cat) && ch != '\u{200c}' && !crate::tables::is_incb_linker(ch)
 }
 
-/// Both `InCB=Linker` and `InCB=Extend` are subsets of `gcb=Extend` and `gcb=ZWJ`,
-/// so any other category rules out both roles without inspecting the codepoint.
+/// `InCB=Extend` is a subset of `gcb=Extend` and `gcb=ZWJ`, so any category
+/// other than those rules out the `InCB=Extend` role without inspecting the codepoint.
+/// However, `InCB=Linker` is *not* necessarily a subset of those categories (since
+/// Unicode 18), so callers that handle Indic conjunct break must check
+/// `is_incb_linker` independently of this function.
 #[inline]
 fn may_be_incb(cat: GraphemeCat) -> bool {
     matches!(cat, GraphemeCat::GC_Extend | GraphemeCat::GC_ZWJ)
@@ -500,19 +506,20 @@ impl GraphemeCursor {
         }
     }
 
-    /// For handling rule GB9c:
+    /// For handling rule GB9c (Unicode 18):
     ///
     /// There's an `InCB=Consonant` after this, and we need to look back
     /// to verify whether there should be a break.
     ///
-    /// Seek backward to find an `InCB=Linker` preceded by an `InCB=Consonsnt`
-    /// (potentially separated by some number of `InCB=Linker` or `InCB=Extend`).
-    /// If we find the consonant in question, then there's no break; if we find a consonant
-    /// with no linker, or a non-linker non-extend non-consonant, or the start of text, there's a break;
-    /// otherwise we need more context
+    /// GB9c: `\p{InCB=Linker} \p{InCB=Extend}* × \p{InCB=Consonant}`
+    ///
+    /// Seek backward to find an `InCB=Linker` (potentially preceded by some
+    /// number of `InCB=Extend`). If we find a linker, then there's no break;
+    /// if we find a non-linker non-extend, or the start of text, there's a break;
+    /// otherwise we need more context.
     #[inline]
     fn handle_incb_consonant(&mut self, chunk: &str, chunk_start: usize) {
-        use crate::tables::{self, grapheme as gr};
+        use crate::tables::is_incb_linker;
 
         // GB9c only applies to extended grapheme clusters
         if !self.is_extended {
@@ -520,26 +527,23 @@ impl GraphemeCursor {
             return;
         }
 
-        let mut incb_linker_count = self.incb_linker_count.unwrap_or(0);
-
         for ch in chunk.chars().rev() {
-            if tables::is_incb_linker(ch) {
-                // We found an InCB linker
-                incb_linker_count += 1;
-                self.incb_linker_count = Some(incb_linker_count);
-            } else if is_incb_extend(self.grapheme_category(ch), ch) {
-                // We ignore InCB extends, continue
+            if is_incb_extend(self.grapheme_category(ch), ch) {
+                // Skip InCB extends
+                continue;
+            } else if is_incb_linker(ch) {
+                // Found a linker, suppress break
+                self.decide(false);
+                return;
             } else {
-                // Prev character is neither linker nor extend, break suppressed iff it's InCB=Consonant
-                let result = !(self.incb_linker_count.unwrap_or(0) > 0
-                    && self.grapheme_category(ch) == gr::GC_InCB_Consonant);
-                self.decide(result);
+                // Not extend, not linker — break
+                self.decide(true);
                 return;
             }
         }
 
         if chunk_start == 0 {
-            // Start of text and we still haven't found a consonant, so break
+            // Start of text and we still haven't found a linker, so break
             self.decide(true);
         } else {
             // We need more context
@@ -765,10 +769,14 @@ impl GraphemeCursor {
                     self.cat_before = Some(self.grapheme_category(ch));
                 }
                 // ZWNJ is the one `gcb=Extend` that is `InCB=None`.
-                if !may_be_incb(self.cat_before.unwrap()) || ch == '\u{200c}' {
+                // Since Unicode 18, some InCB=Linker characters have gcb categories
+                // other than Extend or ZWJ, so check is_incb_linker first.
+                if ch == '\u{200c}' {
                     self.incb_linker_count = Some(0);
                 } else if crate::tables::is_incb_linker(ch) {
                     self.incb_linker_count = Some(self.incb_linker_count.map_or(1, |c| c + 1));
+                } else if !may_be_incb(self.cat_before.unwrap()) {
+                    self.incb_linker_count = Some(0);
                 }
                 if self.cat_before.unwrap() == GraphemeCat::GC_Regional_Indicator {
                     self.ris_count = self.ris_count.map(|c| c + 1);
@@ -863,14 +871,17 @@ impl GraphemeCursor {
                 self.cat_after = self.cat_before.take();
                 self.state = GraphemeState::Unknown;
                 if let Some(incb_linker_count) = self.incb_linker_count {
-                    self.incb_linker_count =
-                        if incb_linker_count > 0 && crate::tables::is_incb_linker(ch) {
+                    self.incb_linker_count = if crate::tables::is_incb_linker(ch) {
+                        if incb_linker_count > 0 {
                             Some(incb_linker_count - 1)
-                        } else if is_incb_extend(self.grapheme_category(ch), ch) {
-                            Some(incb_linker_count)
                         } else {
-                            None
-                        };
+                            Some(0)
+                        }
+                    } else if is_incb_extend(self.grapheme_category(ch), ch) {
+                        Some(incb_linker_count)
+                    } else {
+                        None
+                    };
                 }
                 if let Some(ris_count) = self.ris_count {
                     self.ris_count = if ris_count > 0 {
@@ -1088,4 +1099,69 @@ fn test_grapheme_cursor_emoji_zwj_across_chunks() {
     c.provide_context(chunk0, 0);
     assert_eq!(c.next_boundary(chunk2, chunk2_start), Ok(Some(11)));
     assert_eq!(c.next_boundary(chunk2, chunk2_start), Ok(None));
+}
+
+#[test]
+fn test_incb_consonant_basic() {
+    // GB9c (Unicode 18): \p{InCB=Linker} \p{InCB=Extend}* × \p{InCB=Consonant}
+    // U+094D = Devanagari Sign Virama (InCB=Linker, gcb=Extend)
+    // U+0915 = Devanagari Letter Ka (InCB=Consonant, gcb=InCB_Consonant)
+    // U+093C = Devanagari Sign Nukta (gcb=Extend)
+
+    // Linker + Consonant → no break (extended), break (legacy)
+    let s = "\u{94d}\u{915}";
+    let mut c = GraphemeCursor::new(0, s.len(), true);
+    assert_eq!(c.next_boundary(s, 0), Ok(Some(s.len())));
+
+    let mut c = GraphemeCursor::new(0, s.len(), false);
+    assert_eq!(c.next_boundary(s, 0), Ok(Some(3)));
+
+    // Linker + Extend + Consonant → no break (extended)
+    // U+093C is GC_Extend, so the extend is skipped and the linker is found
+    let s = "\u{94d}\u{93c}\u{915}";
+    let mut c = GraphemeCursor::new(0, s.len(), true);
+    assert_eq!(c.next_boundary(s, 0), Ok(Some(s.len())));
+}
+
+#[test]
+fn test_incb_consonant_no_linker() {
+    // Non-linker + Consonant → break in both modes
+    // U+0903 = Devanagari Sign Anusvara (gcb=SpacingMark)
+    // U+0915 = Devanagari Letter Ka (gcb=InCB_Consonant)
+    let s = "\u{903}\u{915}";
+    let mut c = GraphemeCursor::new(0, s.len(), true);
+    assert_eq!(c.next_boundary(s, 0), Ok(Some(3)));
+    let mut c = GraphemeCursor::new(0, s.len(), false);
+    assert_eq!(c.next_boundary(s, 0), Ok(Some(3)));
+}
+
+#[test]
+fn test_grapheme_cursor_incb_consonant_across_chunks() {
+    use GraphemeIncomplete::*;
+    // U+094D = Virama (Linker, 3 bytes), U+0915 = Ka (Consonant, 3 bytes)
+    // Split so the boundary falls between linker and consonant.
+    let chunk0 = "\u{94d}"; // 3 bytes
+    let chunk1 = "\u{915}"; // 3 bytes
+    let full_len = chunk0.len() + chunk1.len();
+
+    let mut c = GraphemeCursor::new(0, full_len, true);
+    assert_eq!(c.next_boundary(chunk0, 0), Err(NextChunk));
+    // The consonant triggers GB9c lookback; linker is in a previous chunk.
+    assert_eq!(
+        c.next_boundary(chunk1, chunk0.len()),
+        Err(PreContext(chunk0.len()))
+    );
+    c.provide_context(chunk0, 0);
+    assert_eq!(c.next_boundary(chunk1, chunk0.len()), Ok(Some(full_len)));
+}
+
+#[test]
+fn test_incb_extend_excludes_linkers() {
+    // U+1CF5 and U+1CF6 are InCB=Linker, not InCB=Extend.
+    // is_incb_linker must return true for them.
+    assert!(!crate::tables::is_incb_linker('\u{200c}')); // ZWNJ is not a linker
+    assert!(crate::tables::is_incb_linker('\u{94d}')); // Virama is a linker
+    assert!(crate::tables::is_incb_linker('\u{1cf5}')); // Vedic Jihvamuliya (Unicode 18 linker)
+    assert!(crate::tables::is_incb_linker('\u{1cf6}')); // Vedic Upadhmaniya (Unicode 18 linker)
+    assert!(crate::tables::is_incb_linker('\u{11a3a}')); // Zanabazar Square (Unicode 18 linker)
 }
