@@ -457,8 +457,10 @@ impl GraphemeCursor {
         // following category cannot be decided by an earlier rule.
         let after_breaks_first =
             matches!(self.cat_after, Some(gr::GC_Control | gr::GC_CR | gr::GC_LF));
-        if self.is_extended && !after_breaks_first
-            && chunk_start.saturating_add(chunk.len()) == self.offset {
+        if self.is_extended
+            && !after_breaks_first
+            && chunk_start.saturating_add(chunk.len()) == self.offset
+        {
             let ch = chunk.chars().next_back().unwrap();
             if self.grapheme_category(ch) == gr::GC_Prepend {
                 self.decide(false); // GB9b
