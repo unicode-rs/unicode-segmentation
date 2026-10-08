@@ -445,14 +445,22 @@ impl GraphemeCursor {
     /// ```
     pub fn provide_context(&mut self, chunk: &str, chunk_start: usize) {
         use crate::tables::grapheme as gr;
-        assert!(chunk_start.saturating_add(chunk.len()) == self.pre_context_offset.unwrap());
+        // Defensive guard: callers are expected to invoke this only in response
+        // to a `GraphemeIncomplete::PreContext` request with matching chunk end.
+        // Ignore mismatched calls instead of panicking (#170).
+        if self.pre_context_offset != Some(chunk_start.saturating_add(chunk.len())) {
+            return;
+        }
         self.pre_context_offset = None;
         // GB4 and GB5 come before GB9b, so a Control, CR or LF after the
         // Prepend still breaks; only apply the GB9b shortcut when the
         // following category cannot be decided by an earlier rule.
         let after_breaks_first =
             matches!(self.cat_after, Some(gr::GC_Control | gr::GC_CR | gr::GC_LF));
-        if self.is_extended && !after_breaks_first && chunk_start + chunk.len() == self.offset {
+        if self.is_extended
+            && !after_breaks_first
+            && chunk_start.saturating_add(chunk.len()) == self.offset
+        {
             let ch = chunk.chars().next_back().unwrap();
             if self.grapheme_category(ch) == gr::GC_Prepend {
                 self.decide(false); // GB9b
@@ -740,6 +748,11 @@ impl GraphemeCursor {
         if self.offset == self.len {
             return Ok(None);
         }
+        // Defensive guard: the cursor must stay within the text. Out-of-range
+        // cursors used to slice out of bounds or unwrap an empty iterator (#170).
+        if self.offset > self.len || chunk_start > self.offset {
+            return Err(GraphemeIncomplete::InvalidOffset);
+        }
         let mut iter = chunk[self.offset.saturating_sub(chunk_start)..].chars();
         let mut ch = match iter.next() {
             Some(ch) => ch,
@@ -832,12 +845,21 @@ impl GraphemeCursor {
         if self.offset == 0 {
             return Ok(None);
         }
+        // Defensive guard: the cursor must stay within the text, and the chunk
+        // must start at or before it. Out-of-range cursors used to slice out
+        // of bounds or unwrap an empty iterator (#170).
+        if self.offset > self.len || chunk_start > self.offset {
+            return Err(GraphemeIncomplete::InvalidOffset);
+        }
         if self.offset == chunk_start {
             return Err(GraphemeIncomplete::PrevChunk);
         }
-        let mut iter = chunk[..self.offset.saturating_sub(chunk_start)]
-            .chars()
-            .rev();
+        // Clamp to the chunk to avoid panicking on out-of-range offsets
+        // coming from a desynchronized or fuzzed caller (#119); the loop
+        // below then reports `PrevChunk` as for any chunk without a
+        // preceding boundary.
+        let end = self.offset.saturating_sub(chunk_start).min(chunk.len());
+        let mut iter = chunk[..end].chars().rev();
         let mut ch = iter.next().unwrap();
         loop {
             if self.offset == chunk_start {
