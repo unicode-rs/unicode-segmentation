@@ -382,6 +382,8 @@ impl GraphemeCursor {
 
     /// Set the cursor to a new location in the same string.
     ///
+    /// Moving the cursor cancels any pending request for more input.
+    ///
     /// ```rust
     /// # use unicode_segmentation::GraphemeCursor;
     /// let s = "abcd";
@@ -401,8 +403,10 @@ impl GraphemeCursor {
             // reset state derived from text around cursor
             self.cat_before = None;
             self.cat_after = None;
+            self.pre_context_offset = None;
             self.incb_linker_count = None;
             self.ris_count = None;
+            self.resuming = false;
         }
     }
 
@@ -910,6 +914,29 @@ impl GraphemeCursor {
             }
             self.resuming = false;
         }
+    }
+}
+
+#[test]
+fn test_grapheme_cursor_set_cursor_cancels_pending_requests() {
+    use GraphemeIncomplete::*;
+
+    let s = "abcd";
+    for is_extended in [false, true] {
+        let mut c = GraphemeCursor::new(0, s.len(), is_extended);
+        assert_eq!(c.next_boundary(&s[..1], 0), Err(NextChunk));
+        c.set_cursor(2);
+        assert_eq!(c.next_boundary(s, 0), Ok(Some(3)));
+
+        c.set_cursor(s.len());
+        assert_eq!(c.prev_boundary(&s[3..], 3), Err(PrevChunk));
+        c.set_cursor(2);
+        assert_eq!(c.prev_boundary(s, 0), Ok(Some(1)));
+
+        c.set_cursor(2);
+        assert_eq!(c.is_boundary(&s[2..], 2), Err(PreContext(2)));
+        c.set_cursor(1);
+        assert_eq!(c.is_boundary(s, 0), Ok(true));
     }
 }
 
