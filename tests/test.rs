@@ -433,3 +433,91 @@ fn test_size_hint_is_a_valid_bound() {
         check!("unicode_sentences", s, || s.unicode_sentences());
     }
 }
+
+/// `size_hint` has to bracket the items *still to come*, not just the ones a
+/// fresh iterator started with. `test_size_hint_is_a_valid_bound` only queries
+/// iterators that have not been advanced, so a bound measured from the whole
+/// input instead of from the part left to scan passes it at every input.
+#[test]
+fn test_size_hint_is_a_valid_bound_while_iterating() {
+    use crate::testdata::{TEST_SAME, TEST_SENTENCE, TEST_WORD};
+
+    fn check<I: Iterator>(label: &str, s: &str, mut it: I, total: usize) {
+        for taken in 0..=total {
+            let left = total - taken;
+            let (lo, hi) = it.size_hint();
+            assert!(
+                lo <= left,
+                "{}: with {} of {} items taken, size_hint lower {} exceeds the {} left on {:?}",
+                label,
+                taken,
+                total,
+                lo,
+                left,
+                s
+            );
+            if let Some(hi) = hi {
+                assert!(
+                    left <= hi,
+                    "{}: with {} of {} items taken, the {} left exceed size_hint upper {} on {:?}",
+                    label,
+                    taken,
+                    total,
+                    left,
+                    hi,
+                    s
+                );
+            }
+            it.next();
+        }
+    }
+
+    macro_rules! check {
+        ($label:expr, $s:expr, $mk:expr) => {{
+            let mk = $mk;
+            let total = mk().count();
+            check($label, $s, mk(), total);
+        }};
+    }
+
+    let corpus = [
+        "",
+        " ",
+        "a",
+        "ab",
+        "\r\n",
+        "0",
+        "\u{1f600}",
+        "Mr. Fox jumped. [...] The dog was too lazy.",
+    ]
+    .iter()
+    .copied()
+    .chain(TEST_SAME.iter().map(|&(s, _)| s))
+    .chain(TEST_WORD.iter().map(|&(s, _)| s))
+    .chain(TEST_SENTENCE.iter().map(|&(s, _)| s));
+
+    for s in corpus {
+        check!("graphemes(true)", s, || s.graphemes(true));
+        check!("graphemes(false)", s, || s.graphemes(false));
+        check!("grapheme_indices(true)", s, || s.grapheme_indices(true));
+        check!("split_word_bounds", s, || s.split_word_bounds());
+        check!("split_word_bound_indices", s, || s
+            .split_word_bound_indices());
+        check!("unicode_words", s, || s.unicode_words());
+        check!("unicode_word_indices", s, || s.unicode_word_indices());
+        check!("split_sentence_bounds", s, || s.split_sentence_bounds());
+        check!("split_sentence_bound_indices", s, || s
+            .split_sentence_bound_indices());
+        check!("unicode_sentences", s, || s.unicode_sentences());
+
+        // Tightening the bound must not cost the strength it already had: two
+        // or more bytes still promise a sentence before anything is taken.
+        if s.len() >= 2 {
+            assert!(
+                s.split_sentence_bounds().size_hint().0 >= 1,
+                "split_sentence_bounds: fresh size_hint lower bound regressed to 0 on {:?}",
+                s
+            );
+        }
+    }
+}

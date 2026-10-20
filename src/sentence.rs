@@ -176,8 +176,17 @@ mod fwd {
         #[inline]
         fn size_hint(&self) -> (usize, Option<usize>) {
             let slen = self.string.len();
-            // A sentence could be one character
-            (cmp::min(slen, 2), Some(slen + 1))
+            // `next` advances `pos` and never shortens `string`, so only the
+            // breaks at or past `pos` are still to come.
+            let remaining = slen - self.pos;
+            // A sentence could be one character, and while `pos` is 0 the
+            // start-of-text break is still to come as well.
+            let lower = if self.pos == 0 {
+                cmp::min(remaining, 2)
+            } else {
+                cmp::min(remaining, 1)
+            };
+            (lower, Some(slen + 1))
         }
 
         #[inline]
@@ -413,5 +422,47 @@ impl<'a> Iterator for USentenceBoundIndices<'a> {
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.iter.size_hint()
+    }
+}
+
+#[test]
+fn test_sentence_breaks_size_hint_tracks_what_is_left() {
+    // `SentenceBreaks` walks `string` with `pos` instead of reslicing it, so a
+    // bound measured from `string.len()` keeps describing the whole input.
+    for s in [
+        "",
+        "a",
+        "ab",
+        "\r\r",
+        "Hi. There.",
+        "Mr. Fox jumped. [...] The dog was too lazy.",
+    ] {
+        let total = fwd::new_sentence_breaks(s).count();
+        let mut it = fwd::new_sentence_breaks(s);
+        for taken in 0..=total {
+            let left = total - taken;
+            let (lower, upper) = it.size_hint();
+            assert!(
+                lower <= left,
+                "with {} of {} breaks taken, size_hint lower {} exceeds the {} left on {:?}",
+                taken,
+                total,
+                lower,
+                left,
+                s
+            );
+            if let Some(upper) = upper {
+                assert!(
+                    left <= upper,
+                    "with {} of {} breaks taken, the {} left exceed size_hint upper {} on {:?}",
+                    taken,
+                    total,
+                    left,
+                    upper,
+                    s
+                );
+            }
+            it.next();
+        }
     }
 }
