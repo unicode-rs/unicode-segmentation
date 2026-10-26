@@ -283,6 +283,11 @@ impl<'a> Iterator for UWordBounds<'a> {
             // When prev_zwj is true, for the purposes of WB3c, we are in the Zwj state,
             // however we are in the previous state for the purposes of all other rules.
             if prev_zwj && is_emoji(ch) {
+                if let FormatExtend(RequireLetter | RequireHLetter | RequireNumeric) = state {
+                    // The emoji isn't the letter or digit that WB6/WB7b/WB11/WB12 need
+                    // after the MidLetter/MidNum character, so rewind (below).
+                    break;
+                }
                 state = Emoji;
                 continue;
             }

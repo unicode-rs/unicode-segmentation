@@ -237,6 +237,14 @@ fn test_words() {
             &["\u{1f468}\u{200d}\u{1f468}\u{200d}\u{1f466}"],
         ),
         ("😌👎🏼", &["😌", "👎🏼"]),
+        // WB6/WB7, WB7b/WB7c and WB11/WB12 need a letter or digit after the
+        // MidLetter/MidNum character, not ZWJ + emoji
+        ("a.\u{200d}\u{1f44d}", &["a", ".\u{200d}\u{1f44d}"]),
+        (
+            "\u{5d0}\"\u{200d}\u{1f44d}",
+            &["\u{5d0}", "\"\u{200d}\u{1f44d}"],
+        ),
+        ("1,\u{200d}\u{1f44d}", &["1", ",\u{200d}\u{1f44d}"]),
         // perhaps wrong, spaces should not be included?
         ("hello world", &["hello", " ", "world"]),
         ("🇨🇦🇨🇭🇿🇲🇿 hi", &["🇨🇦", "🇨🇭", "🇿🇲", "🇿", " ", "hi"]),
