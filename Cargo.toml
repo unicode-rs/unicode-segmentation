@@ -5,6 +5,7 @@ version = "1.13.3"
 authors = ["kwantam <kwantam@gmail.com>", "Manish Goregaokar <manishsmail@gmail.com>"]
 
 edition = "2018"
+resolver = "3"
 homepage = "https://github.com/unicode-rs/unicode-segmentation"
 repository = "https://github.com/unicode-rs/unicode-segmentation"
 
