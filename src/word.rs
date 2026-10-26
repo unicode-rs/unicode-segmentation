@@ -193,6 +193,7 @@ enum UWordBoundsState {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum FormatExtendType {
     AcceptAny,
+    AcceptAnyLetter,
     AcceptNone,
     RequireLetter,
     RequireHLetter,
@@ -283,12 +284,19 @@ impl<'a> Iterator for UWordBounds<'a> {
             // When prev_zwj is true, for the purposes of WB3c, we are in the Zwj state,
             // however we are in the previous state for the purposes of all other rules.
             if prev_zwj && is_emoji(ch) {
-                if let FormatExtend(RequireLetter | RequireHLetter | RequireNumeric) = state {
-                    // The emoji isn't the letter or digit that WB6/WB7b/WB11/WB12 need
-                    // after the MidLetter/MidNum character, so rewind (below).
-                    break;
-                }
-                state = Emoji;
+                // Some Extended_Pictographic characters (e.g. U+24C2 Ⓜ) also have
+                // Word_Break = ALetter; they satisfy RequireLetter (WB6/WB7) and
+                // continue as Letter for subsequent rules on their right.
+                state = match (state, cat) {
+                    (FormatExtend(RequireLetter), wd::WC_ALetter) => Letter,
+                    (FormatExtend(RequireLetter | RequireHLetter | RequireNumeric), _) => {
+                        // The emoji isn't the letter or digit that WB6/WB7b/WB11/WB12 need
+                        // after the MidLetter/MidNum character, so rewind (below).
+                        break;
+                    }
+                    (_, wd::WC_ALetter) => Letter,
+                    _ => Emoji,
+                };
                 continue;
             }
             // Don't use `continue` in this match without updating `cat`
@@ -474,11 +482,12 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
         let mut savestate = Start;
         let mut cat = wd::WC_Any;
 
-        // WB3c is context-sensitive (ZWJ + Extended_Pictographic),
-        // while WB4 collapses Extend/Format and would otherwise hide that context.
-        // We therefore keep this context outside the main state machine:
-        // whether the nearest non-(Extend|Format) char to the right is emoji.
-        let mut right_significant_is_emoji: bool = false;
+        // WB3c (ZWJ × Extended_Pictographic) is evaluated before WB4.
+        // When an Extended_Pictographic character also has Word_Break = ALetter
+        // (e.g. U+24C2 Ⓜ), the state machine enters `Letter` rather than `Zwj`,
+        // so we separately track whether the character immediately to the right
+        // was an emoji.
+        let mut right_is_emoji = false;
 
         let mut skipped_format_extend = false;
 
@@ -499,16 +508,16 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
             //     Hebrew Letter immediately before it.
             // (2) Format and Extend char handling takes some gymnastics.
 
-            // Reverse-direction WB3c check: when we encounter ZWJ and the nearest
-            // significant right-side char is emoji, do not break here.
-            if cat == wd::WC_ZWJ && state != Zwj && right_significant_is_emoji {
+            // Reverse-direction WB3c check: when we encounter ZWJ and the
+            // immediately preceding char to the right was an ALetter emoji,
+            // do not break here; any non-newline char to the left attaches to
+            // the ZWJ via WB4, while MidLetter/MidNumLetQ can still join an
+            // AHLetter to the left via WB6/WB7.
+            let prev_emoji = right_is_emoji;
+            right_is_emoji = is_emoji(ch);
+            if cat == wd::WC_ZWJ && state != Zwj && prev_emoji {
+                state = FormatExtend(AcceptAnyLetter);
                 continue;
-            }
-
-            // Keep the right-side WB3c context up to date as we move left.
-            // Ignore Extend/Format here to mirror WB4 collapsing behavior.
-            if cat != wd::WC_Extend && cat != wd::WC_Format {
-                right_significant_is_emoji = is_emoji(ch);
             }
 
             if cat == wd::WC_Extend || cat == wd::WC_Format || (cat == wd::WC_ZWJ && state != Zwj) {
@@ -533,7 +542,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
 
             // Don't use `continue` in this match without updating `catb`
             state = match state {
-                Start | FormatExtend(AcceptAny) => match cat {
+                Start | FormatExtend(AcceptAny | AcceptAnyLetter) => match cat {
                     wd::WC_ALetter => Letter,            // rule WB5, WB7, WB10, WB13b
                     wd::WC_Hebrew_Letter => HLetter,     // rule WB5, WB7, WB7c, WB10, WB13b
                     wd::WC_Numeric => Numeric,           // rule WB8, WB9, WB11, WB13b
@@ -541,7 +550,19 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                     wd::WC_ExtendNumLet => ExtendNumLet, // rule WB13a
                     wd::WC_Regional_Indicator => Regional(RegionalState::Unknown), // rule WB13c
                     // rule WB4:
-                    wd::WC_Extend | wd::WC_Format | wd::WC_ZWJ => FormatExtend(AcceptAny),
+                    wd::WC_Extend | wd::WC_Format | wd::WC_ZWJ => {
+                        if state == FormatExtend(AcceptAnyLetter) {
+                            FormatExtend(AcceptAnyLetter)
+                        } else {
+                            FormatExtend(AcceptAny)
+                        }
+                    }
+                    wd::WC_MidLetter | wd::WC_MidNumLet | wd::WC_Single_Quote
+                        if state == FormatExtend(AcceptAnyLetter) =>
+                    {
+                        saveidx = idx;
+                        FormatExtend(RequireLetter) // rule WB7
+                    }
                     wd::WC_Single_Quote => {
                         saveidx = idx;
                         FormatExtend(AcceptQLetter) // rule WB7a
