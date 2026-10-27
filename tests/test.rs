@@ -245,6 +245,12 @@ fn test_words() {
             &["\u{5d0}", "\"\u{200d}\u{1f44d}"],
         ),
         ("1,\u{200d}\u{1f44d}", &["1", ",\u{200d}\u{1f44d}"]),
+        // U+24C2 (Ⓜ) is both Extended_Pictographic (WB3c) and ALetter (WB5/WB6/WB7)
+        ("\u{200d}\u{24c2}a", &["\u{200d}\u{24c2}a"]),
+        ("a.\u{200d}\u{24c2}", &["a.\u{200d}\u{24c2}"]),
+        ("1,\u{200d}\u{24c2}", &["1", ",\u{200d}\u{24c2}"]),
+        ("!\u{200d}\u{24c2}", &["!\u{200d}\u{24c2}"]),
+        ("!:\u{200d}\u{24c2}", &["!", ":\u{200d}\u{24c2}"]),
         // perhaps wrong, spaces should not be included?
         ("hello world", &["hello", " ", "world"]),
         ("🇨🇦🇨🇭🇿🇲🇿 hi", &["🇨🇦", "🇨🇭", "🇿🇲", "🇿", " ", "hi"]),
