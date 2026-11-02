@@ -660,6 +660,11 @@ impl GraphemeCursor {
             return Err(GraphemeIncomplete::PreContext(pre_context_offset));
         }
         let offset_in_chunk = self.offset.saturating_sub(chunk_start);
+        // The cursor offset is required to be a codepoint boundary. Reject
+        // inconsistent input rather than panicking while slicing the chunk.
+        if !chunk.is_char_boundary(offset_in_chunk) {
+            return Err(GraphemeIncomplete::InvalidOffset);
+        }
         if self.cat_after.is_none() {
             let ch = chunk[offset_in_chunk..].chars().next().unwrap();
             self.cat_after = Some(self.grapheme_category(ch));
@@ -1004,6 +1009,18 @@ fn test_grapheme_cursor_prepend_before_control_on_chunk_start() {
         c.provide_context(&s[..prepend_len], 0);
         assert_eq!(c.is_boundary(&s[prepend_len..], prepend_len), Ok(true));
     }
+}
+
+#[test]
+fn test_grapheme_cursor_is_boundary_rejects_non_char_boundary() {
+    // The cursor API requires offsets on codepoint boundaries. An offset in
+    // the middle of a multi-byte character should be rejected rather than
+    // panic while slicing the caller's chunk (issue #119).
+    let mut c = GraphemeCursor::new(1, "Ë".len(), false);
+    assert_eq!(
+        c.is_boundary("Ë", 0),
+        Err(GraphemeIncomplete::InvalidOffset)
+    );
 }
 
 #[test]
