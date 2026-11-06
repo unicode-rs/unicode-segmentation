@@ -170,6 +170,66 @@ fn test_grapheme_cursor_chunked_matches_iterator() {
     }
 }
 
+// `Graphemes` splits pairs of ASCII bytes without the full cursor machinery.
+// Check it against `GraphemeCursor` (which never takes that shortcut) around
+// the cases where an ASCII byte does not end a grapheme.
+#[test]
+fn test_graphemes_ascii_fast_path() {
+    use unicode_segmentation::GraphemeCursor;
+
+    const CASES: &[&str] = &[
+        "ab\r\ncd\r\n",
+        "\r\r\n\n\r",
+        "a\u{301}bc",
+        "ab\u{200d}cd",
+        "xy\u{200d}\u{1F600}z",
+        "ab\u{1F3FB}c",
+        "a\u{94d}\u{915}b",
+        "ab\u{1F1FA}\u{1F1F8}\u{1F1FA}cd",
+        "\u{600}ab\u{903}c",
+        "hello, world!\tfoo\u{7f}bar\0",
+    ];
+
+    for &s in CASES {
+        for is_extended in [true, false] {
+            let mut cursor = GraphemeCursor::new(0, s.len(), is_extended);
+            let mut expected = Vec::new();
+            let mut start = 0;
+            while let Some(end) = cursor.next_boundary(s, 0).unwrap() {
+                expected.push(&s[start..end]);
+                start = end;
+            }
+
+            let fwd: Vec<_> = s.graphemes(is_extended).collect();
+            assert_eq!(fwd, expected, "{s:?} extended={is_extended}");
+            let mut rev: Vec<_> = s.graphemes(is_extended).rev().collect();
+            rev.reverse();
+            assert_eq!(rev, expected, "{s:?} extended={is_extended}");
+
+            // Alternate ends so both cursors interleave.
+            let mut iter = s.graphemes(is_extended);
+            let (mut front, mut back) = (0, expected.len());
+            while front < back {
+                if (front + back) % 2 == 0 {
+                    assert_eq!(iter.next(), Some(expected[front]));
+                    front += 1;
+                } else {
+                    back -= 1;
+                    assert_eq!(iter.next_back(), Some(expected[back]));
+                }
+                assert_eq!(iter.as_str(), expected[front..back].concat());
+            }
+            assert_eq!(iter.next(), None);
+            assert_eq!(iter.next_back(), None);
+        }
+    }
+
+    assert_eq!(
+        "a\u{301}b\r\n".graphemes(true).collect::<Vec<_>>(),
+        ["a\u{301}", "b", "\r\n"]
+    );
+}
+
 // Verify that `GraphemeCursor` chunked mode matches the `Graphemes` iterator
 // for GB9c (Indic conjunct break) sequences, especially when the linker,
 // extends, or consonant fall on chunk boundaries.

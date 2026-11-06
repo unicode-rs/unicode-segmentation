@@ -117,6 +117,17 @@ impl<'a> Iterator for Graphemes<'a> {
         if start == self.cursor_back.cur_cursor() {
             return None;
         }
+        // Fast path: two ASCII bytes other than CR LF always have a boundary
+        // between them (GB3 is the only rule joining ASCII pairs).
+        let bytes = self.string.as_bytes();
+        if bytes[start] < 0x80 {
+            if let Some(&b) = bytes.get(start + 1) {
+                if b < 0x80 && !(bytes[start] == b'\r' && b == b'\n') {
+                    self.cursor.skip_ascii_char();
+                    return Some(&self.string[start..start + 1]);
+                }
+            }
+        }
         let next = self.cursor.next_boundary(self.string, 0).unwrap().unwrap();
         Some(&self.string[start..next])
     }
@@ -348,6 +359,21 @@ impl GraphemeCursor {
             resuming: false,
             grapheme_cat_cache: (0, 0, GraphemeCat::GC_Control),
         }
+    }
+
+    /// Step forward over one ASCII byte whose following byte is also ASCII
+    /// (and not CR LF), leaving the same state `next_boundary` would.
+    /// Only valid when the whole text is passed as a single chunk.
+    #[inline]
+    fn skip_ascii_char(&mut self) {
+        debug_assert!(!self.resuming && self.offset + 1 < self.len);
+        self.offset += 1;
+        self.state = GraphemeState::Break;
+        // Recomputed lazily; ASCII categories need no table lookup.
+        self.cat_before = None;
+        self.cat_after = None;
+        self.incb_linker_count = Some(0);
+        self.ris_count = Some(0);
     }
 
     fn grapheme_category(&mut self, ch: char) -> GraphemeCat {
