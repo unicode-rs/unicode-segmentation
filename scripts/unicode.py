@@ -321,7 +321,7 @@ def check_incb_derivable(grapheme_table, incb_extend, incb_linker):
     sys.stderr.write(
         "InCB=Extend: %d codepoints, all derivable from the grapheme category\n" % len(actual))
 
-def emit_break_module(f, break_table, break_cats, name):
+def emit_break_module(f, break_table, break_cats, name, ascii_table=False):
     Name = name.capitalize()
     f.write("""pub mod %s {
     use core::result::Result::{Ok, Err};
@@ -356,6 +356,21 @@ def emit_break_module(f, break_table, break_cats, name):
         j += 1
       lookup_table[i] = j
 
+    # Optional direct lookup table for ASCII, which skips the binary search
+    # for the most common input.
+    ascii_cats = None
+    ascii_fast_path = ""
+    if ascii_table:
+        ascii_cats = ["Any"] * 0x80
+        for (lo, hi, cat) in break_table:
+            for c in range(lo, min(hi, 0x7f) + 1):
+                ascii_cats[c] = cat
+        ascii_fast_path = """
+        // ASCII fast path: index a direct table instead of binary searching.
+        if (c as u32) < 0x80 {
+            return (c as u32, c as u32, %s_cat_ascii[c as usize]);
+        }""" % name
+
     break_cats.append("Any")
     break_cats.sort()
     for cat in break_cats:
@@ -383,7 +398,7 @@ def emit_break_module(f, break_table, break_cats, name):
         }
     }
 
-    pub fn %s_category(c: char) -> (u32, u32, %sCat) {
+    pub fn %s_category(c: char) -> (u32, u32, %sCat) {%s
         // Perform a quick O(1) lookup in a precomputed table to determine
         // the slice of the range table to search in.
         let lookup_interval = 0x%x;
@@ -404,7 +419,7 @@ def emit_break_module(f, break_table, break_cats, name):
         bsearch_range_value_table(c, &%s_cat_table[range], lower, upper)
     }
 
-""" % (Name, Name, Name[0], name, Name, lookup_interval, name, j, len(break_table), name))
+""" % (Name, Name, Name[0], name, Name, ascii_fast_path, lookup_interval, name, j, len(break_table), name))
 
 
     if len(break_table) <= 0xff:
@@ -413,6 +428,11 @@ def emit_break_module(f, break_table, break_cats, name):
       lookup_type = "u16"
     else:
       lookup_type = "u32"
+
+    if ascii_cats is not None:
+        emit_table(f, "%s_cat_ascii" % name, ascii_cats, "&[%sCat; 128]" % Name,
+            pfun=lambda x: "%sC_%s" % (Name[0], x),
+            is_pub=False, is_const=True)
 
     emit_table(f, "%s_cat_lookup" % name, lookup_table, "&[%s]" % lookup_type,
         pfun=lambda x: "%d" % x,
@@ -492,7 +512,7 @@ const UNICODE_VERSION_U8: (u8, u8, u8) = (%s, %s, %s);
         for cat in word_cats:
             word_table.extend([(x, y, cat) for (x, y) in word_cats[cat]])
         word_table.sort(key=lambda w: w[0])
-        emit_break_module(rf, word_table, list(word_cats.keys()), "word")
+        emit_break_module(rf, word_table, list(word_cats.keys()), "word", ascii_table=True)
 
         # There are some emoji which are also ALetter, so this needs to be stored separately
         # For efficiency, we could still merge the two tables and produce an ALetterEP state
@@ -504,4 +524,5 @@ const UNICODE_VERSION_U8: (u8, u8, u8) = (%s, %s, %s);
         for cat in sentence_cats:
             sentence_table.extend([(x, y, cat) for (x, y) in sentence_cats[cat]])
         sentence_table.sort(key=lambda w: w[0])
-        emit_break_module(rf, sentence_table, list(sentence_cats.keys()), "sentence")
+        emit_break_module(rf, sentence_table, list(sentence_cats.keys()), "sentence",
+                          ascii_table=True)
