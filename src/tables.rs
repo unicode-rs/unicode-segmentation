@@ -1265,6 +1265,10 @@ pub mod word {
     }
 
     pub fn word_category(c: char) -> (u32, u32, WordCat) {
+        // ASCII fast path: index a direct table instead of binary searching.
+        if (c as u32) < 0x80 {
+            return (c as u32, c as u32, word_cat_ascii[c as usize]);
+        }
         // Perform a quick O(1) lookup in a precomputed table to determine
         // the slice of the range table to search in.
         let lookup_interval = 0x80;
@@ -1284,6 +1288,25 @@ pub mod word {
         let upper = lower + lookup_interval - 1;
         bsearch_range_value_table(c, &word_cat_table[range], lower, upper)
     }
+
+    const word_cat_ascii: &[WordCat; 128] = &[
+        WC_Any, WC_Any, WC_Any, WC_Any, WC_Any, WC_Any, WC_Any, WC_Any, WC_Any, WC_Any, WC_LF,
+        WC_Newline, WC_Newline, WC_CR, WC_Any, WC_Any, WC_Any, WC_Any, WC_Any, WC_Any, WC_Any,
+        WC_Any, WC_Any, WC_Any, WC_Any, WC_Any, WC_Any, WC_Any, WC_Any, WC_Any, WC_Any, WC_Any,
+        WC_WSegSpace, WC_Any, WC_Double_Quote, WC_Any, WC_Any, WC_Any, WC_Any, WC_Single_Quote,
+        WC_Any, WC_Any, WC_Any, WC_Any, WC_MidNum, WC_Any, WC_MidNumLet, WC_Any, WC_Numeric,
+        WC_Numeric, WC_Numeric, WC_Numeric, WC_Numeric, WC_Numeric, WC_Numeric, WC_Numeric,
+        WC_Numeric, WC_Numeric, WC_MidLetter, WC_MidNum, WC_Any, WC_Any, WC_Any, WC_Any, WC_Any,
+        WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter,
+        WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter,
+        WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter,
+        WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter, WC_Any, WC_Any, WC_Any, WC_Any,
+        WC_ExtendNumLet, WC_Any, WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter,
+        WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter,
+        WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter,
+        WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter, WC_ALetter, WC_Any,
+        WC_Any, WC_Any, WC_Any, WC_Any
+    ];
 
     const word_cat_lookup: &[u16] = &[
         0, 14, 23, 23, 23, 23, 25, 31, 37, 37, 39, 44, 56, 67, 79, 83, 93, 104, 111, 121, 143, 162,
@@ -2090,6 +2113,10 @@ pub mod sentence {
     }
 
     pub fn sentence_category(c: char) -> (u32, u32, SentenceCat) {
+        // ASCII fast path: index a direct table instead of binary searching.
+        if (c as u32) < 0x80 {
+            return (c as u32, c as u32, sentence_cat_ascii[c as usize]);
+        }
         // Perform a quick O(1) lookup in a precomputed table to determine
         // the slice of the range table to search in.
         let lookup_interval = 0x80;
@@ -2109,6 +2136,23 @@ pub mod sentence {
         let upper = lower + lookup_interval - 1;
         bsearch_range_value_table(c, &sentence_cat_table[range], lower, upper)
     }
+
+    const sentence_cat_ascii: &[SentenceCat; 128] = &[
+        SC_Any, SC_Any, SC_Any, SC_Any, SC_Any, SC_Any, SC_Any, SC_Any, SC_Any, SC_Sp, SC_LF, SC_Sp,
+        SC_Sp, SC_CR, SC_Any, SC_Any, SC_Any, SC_Any, SC_Any, SC_Any, SC_Any, SC_Any, SC_Any,
+        SC_Any, SC_Any, SC_Any, SC_Any, SC_Any, SC_Any, SC_Any, SC_Any, SC_Any, SC_Sp, SC_STerm,
+        SC_Close, SC_Any, SC_Any, SC_Any, SC_Any, SC_Close, SC_Close, SC_Close, SC_Any, SC_Any,
+        SC_SContinue, SC_SContinue, SC_ATerm, SC_Any, SC_Numeric, SC_Numeric, SC_Numeric,
+        SC_Numeric, SC_Numeric, SC_Numeric, SC_Numeric, SC_Numeric, SC_Numeric, SC_Numeric,
+        SC_SContinue, SC_SContinue, SC_Any, SC_Any, SC_Any, SC_STerm, SC_Any, SC_Upper, SC_Upper,
+        SC_Upper, SC_Upper, SC_Upper, SC_Upper, SC_Upper, SC_Upper, SC_Upper, SC_Upper, SC_Upper,
+        SC_Upper, SC_Upper, SC_Upper, SC_Upper, SC_Upper, SC_Upper, SC_Upper, SC_Upper, SC_Upper,
+        SC_Upper, SC_Upper, SC_Upper, SC_Upper, SC_Upper, SC_Upper, SC_Close, SC_Any, SC_Close,
+        SC_Any, SC_Any, SC_Any, SC_Lower, SC_Lower, SC_Lower, SC_Lower, SC_Lower, SC_Lower,
+        SC_Lower, SC_Lower, SC_Lower, SC_Lower, SC_Lower, SC_Lower, SC_Lower, SC_Lower, SC_Lower,
+        SC_Lower, SC_Lower, SC_Lower, SC_Lower, SC_Lower, SC_Lower, SC_Lower, SC_Lower, SC_Lower,
+        SC_Lower, SC_Lower, SC_Close, SC_Any, SC_Close, SC_Any, SC_Any
+    ];
 
     const sentence_cat_lookup: &[u16] = &[
         0, 19, 31, 154, 247, 314, 323, 334, 376, 410, 529, 581, 591, 602, 615, 621, 632, 646, 653,
