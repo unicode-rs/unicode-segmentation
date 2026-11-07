@@ -118,7 +118,8 @@ impl<'a> Iterator for Graphemes<'a> {
             return None;
         }
         // Fast path: two ASCII bytes other than CR LF always have a boundary
-        // between them (GB3 is the only rule joining ASCII pairs).
+        // between them (GB3 is the only rule joining ASCII pairs). Checked by
+        // `test_ascii_fast_path_matches_cursor`.
         let bytes = self.string.as_bytes();
         if bytes[start] < 0x80 {
             if let Some(&b) = bytes.get(start + 1) {
