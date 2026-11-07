@@ -1237,3 +1237,27 @@ fn test_incb_extend_excludes_linkers() {
     assert!(crate::tables::is_incb_linker('\u{1cf6}')); // Vedic Upadhmaniya (Unicode 18 linker)
     assert!(crate::tables::is_incb_linker('\u{11a3a}')); // Zanabazar Square (Unicode 18 linker)
 }
+
+#[test]
+fn test_ascii_fast_path_matches_cursor() {
+    use std::vec::Vec;
+
+    // `Graphemes::next` assumes every ASCII pair except CR LF has a boundary
+    // between them; check that against the full rules for all 128 * 128 pairs.
+    for is_extended in [false, true] {
+        for a in 0u8..0x80 {
+            for b in 0u8..0x80 {
+                let bytes = [a, b];
+                let s = core::str::from_utf8(&bytes).unwrap();
+                let mut c = GraphemeCursor::new(1, s.len(), is_extended);
+                let expected = !(a == b'\r' && b == b'\n');
+                assert_eq!(c.is_boundary(s, 0), Ok(expected), "{a:#04x} {b:#04x}");
+
+                let fwd: Vec<&str> = new_graphemes(s, is_extended).collect();
+                let mut back: Vec<&str> = new_graphemes(s, is_extended).rev().collect();
+                back.reverse();
+                assert_eq!(fwd, back, "{a:#04x} {b:#04x}");
+            }
+        }
+    }
+}
