@@ -477,9 +477,13 @@ impl GraphemeCursor {
     pub fn provide_context(&mut self, chunk: &str, chunk_start: usize) {
         use crate::tables::grapheme as gr;
         // Defensive guard: callers are expected to invoke this only in response
-        // to a `GraphemeIncomplete::PreContext` request with matching chunk end.
-        // Ignore mismatched calls instead of panicking (#170).
-        if self.pre_context_offset != Some(chunk_start.saturating_add(chunk.len())) {
+        // to a `GraphemeIncomplete::PreContext` request with a non-empty chunk
+        // whose end matches the requested offset. Ignore mismatched or empty
+        // chunks instead of panicking (#170).
+        let Some(chunk_end) = chunk_start.checked_add(chunk.len()) else {
+            return;
+        };
+        if chunk.is_empty() || self.pre_context_offset != Some(chunk_end) {
             return;
         }
         self.pre_context_offset = None;
@@ -488,10 +492,7 @@ impl GraphemeCursor {
         // following category cannot be decided by an earlier rule.
         let after_breaks_first =
             matches!(self.cat_after, Some(gr::GC_Control | gr::GC_CR | gr::GC_LF));
-        if self.is_extended
-            && !after_breaks_first
-            && chunk_start.saturating_add(chunk.len()) == self.offset
-        {
+        if self.is_extended && !after_breaks_first && chunk_end == self.offset {
             let ch = chunk.chars().next_back().unwrap();
             if self.grapheme_category(ch) == gr::GC_Prepend {
                 self.decide(false); // GB9b
@@ -503,7 +504,7 @@ impl GraphemeCursor {
             GraphemeState::Regional => self.handle_regional(chunk, chunk_start),
             GraphemeState::Emoji { seen_zwj } => self.handle_emoji(chunk, chunk_start, seen_zwj),
             _ => {
-                if self.cat_before.is_none() && self.offset == chunk.len() + chunk_start {
+                if self.cat_before.is_none() && self.offset == chunk_end {
                     let ch = chunk.chars().next_back().unwrap();
                     self.cat_before = Some(self.grapheme_category(ch));
                 }
@@ -678,15 +679,20 @@ impl GraphemeCursor {
         if self.state == GraphemeState::NotBreak {
             return Ok(false);
         }
-        if (self.offset < chunk_start || self.offset >= chunk_start.saturating_add(chunk.len()))
-            && (self.offset > chunk_start.saturating_add(chunk.len()) || self.cat_after.is_none())
+        let Some(chunk_end) = chunk_start.checked_add(chunk.len()) else {
+            return Err(GraphemeIncomplete::InvalidOffset);
+        };
+        if self.offset > self.len
+            || self.offset < chunk_start
+            || self.offset > chunk_end
+            || (self.offset == chunk_end && self.cat_after.is_none())
         {
             return Err(GraphemeIncomplete::InvalidOffset);
         }
         if let Some(pre_context_offset) = self.pre_context_offset {
             return Err(GraphemeIncomplete::PreContext(pre_context_offset));
         }
-        let offset_in_chunk = self.offset.saturating_sub(chunk_start);
+        let offset_in_chunk = self.offset - chunk_start;
         // The cursor offset is required to be a codepoint boundary. Reject
         // inconsistent input rather than panicking while slicing the chunk.
         if !chunk.is_char_boundary(offset_in_chunk) {
@@ -784,12 +790,20 @@ impl GraphemeCursor {
         if self.offset == self.len {
             return Ok(None);
         }
-        // Defensive guard: the cursor must stay within the text. Out-of-range
-        // cursors used to slice out of bounds or unwrap an empty iterator (#170).
-        if self.offset > self.len || chunk_start > self.offset {
+        // Defensive guard: the cursor must stay within the text and on a
+        // codepoint boundary within `chunk`. Out-of-range or mid-codepoint
+        // offsets used to slice out of bounds or mid-character (#170).
+        let Some(offset_in_chunk) = self.offset.checked_sub(chunk_start) else {
+            return Err(GraphemeIncomplete::InvalidOffset);
+        };
+        if self.offset > self.len
+            || chunk_start.checked_add(chunk.len()).is_none()
+            || offset_in_chunk > chunk.len()
+            || !chunk.is_char_boundary(offset_in_chunk)
+        {
             return Err(GraphemeIncomplete::InvalidOffset);
         }
-        let mut iter = chunk[self.offset.saturating_sub(chunk_start)..].chars();
+        let mut iter = chunk[offset_in_chunk..].chars();
         let mut ch = match iter.next() {
             Some(ch) => ch,
             None => return Err(GraphemeIncomplete::NextChunk),
@@ -881,21 +895,23 @@ impl GraphemeCursor {
         if self.offset == 0 {
             return Ok(None);
         }
-        // Defensive guard: the cursor must stay within the text, and the chunk
-        // must start at or before it. Out-of-range cursors used to slice out
-        // of bounds or unwrap an empty iterator (#170).
-        if self.offset > self.len || chunk_start > self.offset {
+        // Defensive guard: the cursor must stay within the text and on a
+        // codepoint boundary within `chunk`. Out-of-range or mid-codepoint
+        // offsets used to slice out of bounds or unwrap an empty iterator (#170).
+        let Some(offset_in_chunk) = self.offset.checked_sub(chunk_start) else {
+            return Err(GraphemeIncomplete::InvalidOffset);
+        };
+        if self.offset > self.len
+            || chunk_start.checked_add(chunk.len()).is_none()
+            || offset_in_chunk > chunk.len()
+            || !chunk.is_char_boundary(offset_in_chunk)
+        {
             return Err(GraphemeIncomplete::InvalidOffset);
         }
-        if self.offset == chunk_start {
+        if offset_in_chunk == 0 {
             return Err(GraphemeIncomplete::PrevChunk);
         }
-        // Clamp to the chunk to avoid panicking on out-of-range offsets
-        // coming from a desynchronized or fuzzed caller (#119); the loop
-        // below then reports `PrevChunk` as for any chunk without a
-        // preceding boundary.
-        let end = self.offset.saturating_sub(chunk_start).min(chunk.len());
-        let mut iter = chunk[..end].chars().rev();
+        let mut iter = chunk[..offset_in_chunk].chars().rev();
         let mut ch = iter.next().unwrap();
         loop {
             if self.offset == chunk_start {
@@ -1048,6 +1064,141 @@ fn test_grapheme_cursor_is_boundary_rejects_non_char_boundary() {
         c.is_boundary("Ë", 0),
         Err(GraphemeIncomplete::InvalidOffset)
     );
+}
+
+#[test]
+fn test_grapheme_cursor_next_and_prev_reject_non_char_boundary() {
+    use GraphemeIncomplete::InvalidOffset;
+
+    let mut c = GraphemeCursor::new(1, "Ë".len(), false);
+    assert_eq!(c.next_boundary("Ë", 0), Err(InvalidOffset));
+
+    let mut c = GraphemeCursor::new(1, "Ë".len(), false);
+    assert_eq!(c.prev_boundary("Ë", 0), Err(InvalidOffset));
+
+    // Issue #170 case (3a): offset 16 falls inside two-byte 'ʙ' (bytes 15..17).
+    let s = "\0\0\u{1}\u{7f}\u{7f}\u{7f}\u{7f}\u{7f}\u{7f}\u{7f}\u{7f}\u{7f}\u{7f}\u{7f}\u{7f}ʙ\0W";
+    let mut c = GraphemeCursor::new(16, usize::MAX, false);
+    assert_eq!(c.prev_boundary(s, 0), Err(InvalidOffset));
+    assert_eq!(c.next_boundary(s, 0), Err(InvalidOffset));
+}
+
+#[test]
+fn test_grapheme_cursor_rejects_out_of_range_chunks_and_offsets() {
+    use GraphemeIncomplete::*;
+
+    // Chunk ends strictly before cursor offset.
+    let mut c = GraphemeCursor::new(5, 10, true);
+    assert_eq!(c.next_boundary("ab", 0), Err(InvalidOffset));
+    assert_eq!(c.prev_boundary("ab", 0), Err(InvalidOffset));
+    assert_eq!(c.next_boundary("", 0), Err(InvalidOffset));
+    assert_eq!(c.prev_boundary("", 0), Err(InvalidOffset));
+
+    // Chunk ends right at cursor offset: NextChunk for next_boundary; valid
+    // pre-chunk or PrevChunk for prev_boundary.
+    let mut c = GraphemeCursor::new(2, 4, true);
+    assert_eq!(c.next_boundary("ab", 0), Err(NextChunk));
+    assert_eq!(c.prev_boundary("", 2), Err(PrevChunk));
+
+    // `is_boundary` when `offset < chunk_start` even after `cat_after` is cached,
+    // or when `offset > len`, or when `chunk_start + chunk.len()` overflows.
+    let mut c = GraphemeCursor::new(2, 10, true);
+    assert_eq!(c.prev_boundary("a", 1), Err(PrevChunk));
+    assert_eq!(c.cur_cursor(), 1);
+    assert_eq!(c.is_boundary("b", 5), Err(InvalidOffset));
+
+    let mut c = GraphemeCursor::new(5, 2, true);
+    assert_eq!(c.is_boundary("abcdef", 0), Err(InvalidOffset));
+
+    let mut c = GraphemeCursor::new(usize::MAX - 1, usize::MAX, false);
+    assert_eq!(c.is_boundary("ab", usize::MAX), Err(InvalidOffset));
+    assert_eq!(c.next_boundary("ab", usize::MAX), Err(InvalidOffset));
+    assert_eq!(c.prev_boundary("ab", usize::MAX), Err(InvalidOffset));
+}
+
+#[test]
+fn test_grapheme_cursor_provide_context_ignores_empty_or_overflowing_chunk() {
+    use GraphemeIncomplete::PreContext;
+
+    for s in ["\r\n", "\u{06dd}a", "\u{1f1f7}\u{1f1f8}", "🍒\u{200d}🥑"] {
+        let split = s.char_indices().nth(1).unwrap().0;
+        let mut c = GraphemeCursor::new(split, s.len(), true);
+        assert_eq!(c.is_boundary(&s[split..], split), Err(PreContext(split)));
+
+        // Empty chunk and overflowing `chunk_start + chunk.len()` must be ignored
+        // without panicking or clearing the pending `PreContext` request (#170).
+        c.provide_context("", split);
+        c.provide_context("a", usize::MAX);
+        assert_eq!(c.is_boundary(&s[split..], split), Err(PreContext(split)));
+
+        c.provide_context(&s[..split], 0);
+        let expected = GraphemeCursor::new(split, s.len(), true)
+            .is_boundary(s, 0)
+            .unwrap();
+        assert_eq!(c.is_boundary(&s[split..], split), Ok(expected));
+    }
+}
+
+#[cfg(target_pointer_width = "64")]
+#[test]
+fn test_grapheme_cursor_issue_170_fuzz_reproducers() {
+    use GraphemeIncomplete::InvalidOffset;
+
+    let mut c = GraphemeCursor::new(18229554450312027253, 8877211129670018651, true);
+    assert_eq!(
+        c.prev_boundary(" \\u{", 8969870161476615468),
+        Err(InvalidOffset)
+    );
+
+    let mut c = GraphemeCursor::new(9165160804024148064, 6944656592455360608, true);
+    assert_eq!(
+        c.next_boundary("`111", 6944656592455360608),
+        Err(InvalidOffset)
+    );
+
+    let mut c = GraphemeCursor::new(3544668469065756977, 3544668469065756977, false);
+    assert_eq!(
+        c.prev_boundary("1111", 14857710733020442929),
+        Err(InvalidOffset)
+    );
+
+    let mut c = GraphemeCursor::new(6712945236183381371, 7017505629193139579, true);
+    c.provide_context("}}}}}}", 3493998360278433149);
+
+    let mut c = GraphemeCursor::new(3544668469065756985, 3472609582225829921, true);
+    assert_eq!(
+        c.prev_boundary("\u{740}ြ\u{740}\u{740}[\\E100", 3544668469065756976),
+        Err(InvalidOffset)
+    );
+    assert_eq!(
+        c.next_boundary("1\u{740}\u{740}[\\[|0\u{f}11-[D", 9251902466196254769),
+        Err(InvalidOffset)
+    );
+
+    let mut c = GraphemeCursor::new(16, 17870283321406128129, false);
+    assert_eq!(
+        c.prev_boundary(
+            "\0\0\u{1}\u{7f}\u{7f}\u{7f}\u{7f}\u{7f}\u{7f}\u{7f}\u{7f}\u{7f}\u{7f}\u{7f}\u{7f}ʙ\0W",
+            0,
+        ),
+        Err(InvalidOffset)
+    );
+
+    let mut c = GraphemeCursor::new(8935127994137148074, 13811976078547984555, true);
+    assert_eq!(
+        c.next_boundary("\u{600}\u{600}\u{b4d}ꦓ\u{f}", 8935127994137148075),
+        Err(InvalidOffset)
+    );
+
+    let mut c = GraphemeCursor::new(9042521604759584127, 6727108446334188925, false);
+    assert_eq!(c.is_boundary("}Ԟ", 9042521604759584125), Err(InvalidOffset));
+
+    let mut c = GraphemeCursor::new(14323354221939181254, 14339398540424824518, true);
+    assert_eq!(
+        c.is_boundary("\u{7f}", 14323354221939181254),
+        Err(GraphemeIncomplete::PreContext(14323354221939181254))
+    );
+    c.provide_context("\0R", 18410714726934759110);
 }
 
 #[test]
